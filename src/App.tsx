@@ -396,7 +396,7 @@ function Footer({ isDark = false, bgImage }: { isDark?: boolean, bgImage?: strin
 
       {/* Bottom Legal / Engineered By */}
       <div className={`relative z-20 w-full px-6 md:px-14 flex flex-col md:flex-row items-center justify-between py-2.5 text-paper`}>
-        <div className="font-sans text-[11px] tracking-[0.35em] uppercase font-medium text-paper/85 mb-3 md:mb-0 drop-shadow-[0_2px_10px_rgba(0,0,0,0.95)]">
+        <div className="font-sans text-[8.5px] sm:text-[9.5px] md:text-[11px] tracking-[0.3em] md:tracking-[0.35em] uppercase font-medium text-paper/85 mb-3 md:mb-0 drop-shadow-[0_2px_10px_rgba(0,0,0,0.95)]">
           © 2026 Ndumiso &amp; Sithandiwe
         </div>
         <MagneticWrapper>
@@ -404,10 +404,10 @@ function Footer({ isDark = false, bgImage }: { isDark?: boolean, bgImage?: strin
             href="https://arsonPixelz.com" 
             target="_blank" 
             rel="noopener noreferrer"
-            className="group flex items-center gap-3 font-sans text-[11px] tracking-[0.35em] uppercase text-paper/85 hover:text-paper transition-all p-1 drop-shadow-[0_2px_10px_rgba(0,0,0,0.95)]"
+            className="group flex items-center gap-2 md:gap-3 font-sans text-[8.5px] sm:text-[9.5px] md:text-[11px] tracking-[0.3em] md:tracking-[0.35em] uppercase text-paper/85 hover:text-paper transition-all p-1 drop-shadow-[0_2px_10px_rgba(0,0,0,0.95)]"
           >
             <span className="font-light">Engineered by</span>
-            <span className="font-bold tracking-[0.4em] relative overflow-hidden text-paper">
+            <span className="font-bold tracking-[0.32em] md:tracking-[0.4em] relative overflow-hidden text-paper">
               arsonPixelz
               <span className="absolute bottom-0 left-0 w-full h-px bg-current -translate-x-full group-hover:translate-x-0 transition-transform duration-500 ease-out" />
             </span>
@@ -987,7 +987,7 @@ function Details() {
         <div className="absolute inset-0 opacity-[0.15] mix-blend-overlay pointer-events-none z-20 translate-z-0" style={{ backgroundImage: 'url("data:image/svg+xml,%3Csvg viewBox=%220 0 200 200%22 xmlns=%22http://www.w3.org/2000/svg%22%3E%3Cfilter id=%22noise%22%3E%3CfeTurbulence type=%22fractalNoise%22 baseFrequency=%221.8%22 numOctaves=%224%22 stitchTiles=%22stitch%22/%3E%3C/filter%3E%3Crect width=%22100%25%22 height=%22100%25%22 filter=%22url(%23noise)%22/%3E%3C/svg%3E")' }} />
       </div>
 
-      <div className="relative z-10 w-full max-w-[80rem] mx-auto px-6 md:px-12 lg:px-24 pt-24 pb-24 flex flex-col">
+      <div className="relative z-10 w-full max-w-[80rem] mx-auto px-6 md:px-12 lg:px-24 pt-24 pb-6 md:pb-8 flex flex-col">
         {/* Hero Section */}
         <div className="flex flex-col items-center justify-start min-h-[85vh] text-center pt-8">
           
@@ -1046,10 +1046,10 @@ function Details() {
            
           {/* Ceremony */}
           <motion.div
-            initial={{ opacity: 0, y: 50, filter: 'blur(12px)' }}
-            whileInView={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
-            viewport={{ once: false, amount: 0.2 }}
-            transition={{ duration: 1.2, ease: [0.76, 0, 0.24, 1] }}
+            initial={{ opacity: 0, y: 35 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, amount: 0.2 }}
+            transition={{ duration: 1.0, ease: [0.16, 1, 0.3, 1] }}
             className="flex flex-col items-center text-center md:pr-12 lg:pr-24"
           >
             <h2 className="font-serif text-4xl mb-8 italic text-[#E8D3B9]">01.</h2>
@@ -1063,10 +1063,10 @@ function Details() {
 
           {/* Reception */}
           <motion.div
-            initial={{ opacity: 0, y: 50, filter: 'blur(12px)' }}
-            whileInView={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
-            viewport={{ once: false, amount: 0.2 }}
-            transition={{ duration: 1.2, delay: 0.2, ease: [0.76, 0, 0.24, 1] }}
+            initial={{ opacity: 0, y: 35 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, amount: 0.2 }}
+            transition={{ duration: 1.0, delay: 0.15, ease: [0.16, 1, 0.3, 1] }}
             className="flex flex-col items-center text-center md:pl-12 lg:pl-24"
           >
             <h2 className="font-serif text-4xl mb-8 italic text-[#E8D3B9]">02.</h2>
@@ -1079,44 +1079,45 @@ function Details() {
           </motion.div>
         </div>
 
-        {/* Luxury Translucent RSVP Enclosure - the single RSVP on this page,
-            placed low where the old white footer block used to sit */}
-        <motion.div
-          initial={{ opacity: 0, y: 60, filter: 'blur(15px)' }}
-          whileInView={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
-          viewport={{ once: true, amount: 0.2 }}
-          transition={{ duration: 1.4, ease: [0.76, 0, 0.24, 1] }}
-          className="w-full bg-ink/35 backdrop-blur-md border border-[#E8D3B9]/25 rounded-3xl p-12 lg:p-24 py-16 lg:py-24 relative overflow-hidden flex flex-col items-center text-center shadow-2xl mt-40 md:mt-56"
-        >
-          {/* Elegant double inner border */}
-          <div className="absolute inset-3 border border-[#E8D3B9]/15 rounded-2xl pointer-events-none" />
-          
-          <h2 className="font-sans text-[11px] tracking-[0.6em] uppercase text-[#E8D3B9] mb-8 relative z-10 font-bold">Respond</h2>
-          <h3 className="font-serif text-6xl md:text-8xl mb-6 italic font-light relative z-10 text-paper">Kindly Reply</h3>
-          <p className="font-sans text-[11px] md:text-xs text-[#F5EDE4]/80 mb-14 max-w-sm leading-loose tracking-[0.25em] relative z-10">
-            Please honor us with your response by March 15th, 2026.
-          </p>
-          
-          {/* Re-imagined Bespoke RSVP Button */}
-          <MagneticWrapper>
-            <button 
-              onClick={() => setIsRsvpModalOpen(true)}
-              className="group relative overflow-hidden flex items-center gap-6 px-12 py-5 rounded-full border border-[#E8D3B9] bg-[#E8D3B9] text-ink font-sans text-[11px] tracking-[0.45em] uppercase font-bold transition-all duration-500 shadow-[0_10px_35px_rgba(232,211,185,0.3)] hover:shadow-[0_15px_50px_rgba(232,211,185,0.5)] hover:bg-[#FAF8F5] hover:scale-[1.02]"
-            >
-              <span className="relative z-10 font-bold">Reserve Your Seat</span>
-              <div className="w-8 h-8 rounded-full bg-ink text-paper flex items-center justify-center relative z-10 transition-transform duration-500 group-hover:translate-x-1">
-                <ArrowRight className="w-4 h-4 text-[#E8D3B9]" />
-              </div>
-            </button>
-          </MagneticWrapper>
-        </motion.div>
+        {/* Bottom RSVP Section - Anchors gracefully at the bottom with ~2cm margin */}
+        <div className="min-h-[75vh] md:min-h-[85vh] flex flex-col justify-end items-center w-full pt-16 md:pt-24">
+          <motion.div
+            initial={{ opacity: 0, y: 35 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, amount: 0.15 }}
+            transition={{ duration: 1.2, ease: [0.16, 1, 0.3, 1] }}
+            className="w-full max-w-3xl bg-ink/40 backdrop-blur-md border border-[#E8D3B9]/25 rounded-3xl p-8 sm:p-10 md:p-14 relative overflow-hidden flex flex-col items-center text-center shadow-2xl"
+          >
+            {/* Elegant double inner border */}
+            <div className="absolute inset-3 border border-[#E8D3B9]/15 rounded-2xl pointer-events-none" />
+            
+            <h2 className="font-sans text-[11px] tracking-[0.6em] uppercase text-[#E8D3B9] mb-5 relative z-10 font-bold">Respond</h2>
+            <h3 className="font-serif text-5xl md:text-7xl mb-4 italic font-light relative z-10 text-paper">Kindly Reply</h3>
+            <p className="font-sans text-[11px] md:text-xs text-[#F5EDE4]/80 mb-10 max-w-sm leading-loose tracking-[0.25em] relative z-10">
+              Please honor us with your response by March 15th, 2026.
+            </p>
+            
+            {/* Re-imagined Bespoke RSVP Button */}
+            <MagneticWrapper>
+              <button 
+                onClick={() => setIsRsvpModalOpen(true)}
+                className="group relative overflow-hidden flex items-center gap-6 px-10 md:px-12 py-4 md:py-5 rounded-full border border-[#E8D3B9] bg-[#E8D3B9] text-ink font-sans text-[11px] tracking-[0.45em] uppercase font-bold transition-all duration-500 shadow-[0_10px_35px_rgba(232,211,185,0.3)] hover:shadow-[0_15px_50px_rgba(232,211,185,0.5)] hover:bg-[#FAF8F5] hover:scale-[1.02]"
+              >
+                <span className="relative z-10 font-bold">Reserve Your Seat</span>
+                <div className="w-8 h-8 rounded-full bg-ink text-paper flex items-center justify-center relative z-10 transition-transform duration-500 group-hover:translate-x-1">
+                  <ArrowRight className="w-4 h-4 text-[#E8D3B9]" />
+                </div>
+              </button>
+            </MagneticWrapper>
+          </motion.div>
 
-        {/* Slim transparent credit line (no duplicate RSVP, no white block) */}
-        <div className="relative z-10 w-full mt-32 mb-4 flex flex-col md:flex-row items-center justify-between gap-6 text-paper/85 font-sans text-[11px] tracking-[0.35em] uppercase" style={{ textShadow: '0 2px 10px rgba(0,0,0,0.95)' }}>
-          <span>© 2026 Ndumiso &amp; Sithandiwe</span>
-          <a href="https://arsonPixelz.com" target="_blank" rel="noopener noreferrer" className="hover:text-paper transition-colors">
-            <span className="font-light">Engineered by </span><span className="font-bold tracking-[0.4em]">arsonPixelz</span>
-          </a>
+          {/* Slim transparent credit line (no duplicate RSVP, scaled down on mobile) */}
+          <div className="relative z-10 w-full mt-6 md:mt-8 mb-2 flex flex-col md:flex-row items-center justify-between gap-3 text-paper/85 font-sans text-[8.5px] sm:text-[9.5px] md:text-[11px] tracking-[0.3em] md:tracking-[0.35em] uppercase" style={{ textShadow: '0 2px 10px rgba(0,0,0,0.95)' }}>
+            <span>© 2026 Ndumiso &amp; Sithandiwe</span>
+            <a href="https://arsonPixelz.com" target="_blank" rel="noopener noreferrer" className="hover:text-paper transition-colors">
+              <span className="font-light">Engineered by </span><span className="font-bold tracking-[0.32em] md:tracking-[0.4em]">arsonPixelz</span>
+            </a>
+          </div>
         </div>
       </div>
 
