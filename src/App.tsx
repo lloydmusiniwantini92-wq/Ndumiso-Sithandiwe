@@ -81,7 +81,7 @@ function AudioProvider({ children }: { children: React.ReactNode }) {
   const [isCrescendo, setIsCrescendo] = useState(false);
 
   useEffect(() => {
-    const audio = new Audio('/Iyaman\'mana Original.mp3');
+    const audio = new Audio('/cinema.mp3');
     audio.loop = true;
     audio.volume = 0; 
     audioRef.current = audio;
@@ -155,29 +155,34 @@ function AudioProvider({ children }: { children: React.ReactNode }) {
 
 // --- COMPONENTS ---
 
-// Advanced physics-based magnetic wrapper for luxury interactions
+// Advanced physics-based magnetic wrapper for luxury interactions (zero-lag motion values, no React re-renders)
 function MagneticWrapper({ children, className = "" }: any) {
   const ref = useRef<HTMLDivElement>(null);
-  const [position, setPosition] = useState({ x: 0, y: 0 });
+  const x = useMotionValue(0);
+  const y = useMotionValue(0);
+  const springX = useSpring(x, { stiffness: 400, damping: 25, mass: 0.1 });
+  const springY = useSpring(y, { stiffness: 400, damping: 25, mass: 0.1 });
 
   const handleMouse = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!ref.current) return;
     const { clientX, clientY } = e;
-    const { height, width, left, top } = ref.current!.getBoundingClientRect();
-    const middleX = clientX - (left + width / 2);
-    const middleY = clientY - (top + height / 2);
-    setPosition({ x: middleX * 0.25, y: middleY * 0.25 });
+    const { height, width, left, top } = ref.current.getBoundingClientRect();
+    x.set((clientX - (left + width / 2)) * 0.28);
+    y.set((clientY - (top + height / 2)) * 0.28);
   };
 
-  const reset = () => setPosition({ x: 0, y: 0 });
+  const reset = () => {
+    x.set(0);
+    y.set(0);
+  };
 
   return (
     <motion.div
       ref={ref}
       onMouseMove={handleMouse}
       onMouseLeave={reset}
-      animate={{ x: position.x, y: position.y }}
-      transition={{ type: "spring", stiffness: 150, damping: 15, mass: 0.1 }}
-      className={`relative inline-flex z-10 ${className}`}
+      style={{ x: springX, y: springY }}
+      className={`relative inline-flex z-10 will-change-transform ${className}`}
     >
       {children}
     </motion.div>
@@ -239,52 +244,48 @@ function Preloader({ onComplete }: { onComplete: () => void }) {
   );
 }
 
+// Ultra-snappy avant-garde custom cursor: 0ms lag, hardware-accelerated direct tracking
 function CustomCursor() {
-  const mouseX = useMotionValue(0);
-  const mouseY = useMotionValue(0);
-
-  const springConfig = { stiffness: 500, damping: 28, mass: 0.5 };
-  const cursorX = useSpring(mouseX, springConfig);
-  const cursorY = useSpring(mouseY, springConfig);
-
+  const cursorX = useMotionValue(-100);
+  const cursorY = useMotionValue(-100);
   const [isHovering, setIsHovering] = useState(false);
 
   useEffect(() => {
     const updateMousePosition = (e: MouseEvent) => {
-      mouseX.set(e.clientX - 8);
-      mouseY.set(e.clientY - 8);
+      cursorX.set(e.clientX - 8);
+      cursorY.set(e.clientY - 8);
     };
     
     const handleMouseOver = (e: MouseEvent) => {
-      const target = e.target as HTMLElement;
-      if (target.tagName.toLowerCase() === 'a' || target.tagName.toLowerCase() === 'button' || target.closest('a') || target.closest('button')) {
+      const target = e.target as HTMLElement | null;
+      if (!target) return;
+      if (target.closest('a, button, [role="button"], input, select, textarea')) {
         setIsHovering(true);
       } else {
         setIsHovering(false);
       }
     };
 
-    window.addEventListener('mousemove', updateMousePosition);
-    window.addEventListener('mouseover', handleMouseOver);
+    window.addEventListener('mousemove', updateMousePosition, { passive: true });
+    window.addEventListener('mouseover', handleMouseOver, { passive: true });
 
     return () => {
       window.removeEventListener('mousemove', updateMousePosition);
       window.removeEventListener('mouseover', handleMouseOver);
     };
-  }, [mouseX, mouseY]);
+  }, [cursorX, cursorY]);
 
   return (
     <motion.div
-      className="fixed top-0 left-0 w-4 h-4 bg-paper rounded-full pointer-events-none z-[10000] mix-blend-difference hidden md:block"
+      className="fixed top-0 left-0 w-4 h-4 bg-paper rounded-full pointer-events-none z-[10000] mix-blend-difference hidden md:block will-change-transform"
       style={{
         x: cursorX,
-        y: cursorY
+        y: cursorY,
       }}
       animate={{
-        scale: isHovering ? 2.5 : 1,
-        opacity: 1
+        scale: isHovering ? 2.6 : 1,
       }}
-      transition={{ scale: { type: "spring", stiffness: 300, damping: 20 } }}
+      transition={{ scale: { type: "spring", stiffness: 600, damping: 25 } }}
     />
   );
 }
@@ -906,7 +907,7 @@ function Journey() {
         <div className="absolute inset-0 opacity-[0.03] mix-blend-multiply pointer-events-none" style={{ backgroundImage: 'url("data:image/svg+xml,%3Csvg viewBox=%220 0 200 200%22 xmlns=%22http://www.w3.org/2000/svg%22%3E%3Cfilter id=%22noise%22%3E%3CfeTurbulence type=%22fractalNoise%22 baseFrequency=%221.5%22 numOctaves=%223%22 stitchTiles=%22stitch%22/%3E%3C/filter%3E%3Crect width=%22100%25%22 height=%22100%25%22 filter=%22url(%23noise)%22/%3E%3C/svg%3E")' }} />
       </div>
 
-      <div className="relative h-screen w-full overflow-hidden flex flex-col items-center justify-end pb-20 md:pb-28 bg-ink shrink-0">
+      <div className="relative h-screen w-full overflow-hidden flex flex-col items-center justify-end pb-48 md:pb-60 lg:pb-68 bg-ink shrink-0">
         <motion.div style={{ y: heroY }} className="absolute inset-0 z-0 w-full h-full">
           <AnimatePresence>
             <motion.img
@@ -930,15 +931,15 @@ function Journey() {
         </motion.div>
 
         {/* Cinematic gradient cradle for high contrast and legibility */}
-        <div className="absolute inset-x-0 bottom-0 h-96 bg-gradient-to-t from-ink via-ink/80 to-transparent pointer-events-none z-10" />
-        <div className="absolute inset-x-0 bottom-0 h-64 backdrop-blur-md [mask-image:linear-gradient(to_top,black,transparent)] pointer-events-none z-10" />
+        <div className="absolute inset-x-0 bottom-0 h-[40rem] bg-gradient-to-t from-ink via-ink/75 to-transparent pointer-events-none z-10" />
+        <div className="absolute inset-x-0 bottom-0 h-80 backdrop-blur-md [mask-image:linear-gradient(to_top,black,transparent)] pointer-events-none z-10" />
 
-        <div className="relative z-20 text-center px-4 flex flex-col items-center pointer-events-none mb-6">
+        <div className="relative z-20 text-center px-4 flex flex-col items-center pointer-events-none mb-4">
           <motion.p
             initial={{ opacity: 0, y: 15 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.6, duration: 1.2 }}
-            className="font-sans text-[10px] md:text-xs tracking-[0.55em] uppercase text-paper/90 font-medium mb-3 drop-shadow-[0_2px_12px_rgba(0,0,0,0.9)]"
+            className="font-sans text-[11px] md:text-sm tracking-[0.6em] uppercase text-paper/90 font-medium mb-4 drop-shadow-[0_2px_12px_rgba(0,0,0,0.9)]"
           >
             A Story in Five Chapters
           </motion.p>
@@ -946,10 +947,10 @@ function Journey() {
             initial={{ opacity: 0, filter: 'blur(30px)', y: 40 }}
             animate={{ opacity: 1, filter: 'blur(0px)', y: 0 }}
             transition={{ delay: 0.9, duration: 2.2, ease: [0.76, 0, 0.24, 1] }}
-            className="font-serif text-7xl sm:text-8xl md:text-[10.5rem] lg:text-[13rem] px-4 leading-[0.8] tracking-[-0.04em] text-paper text-center drop-shadow-[0_25px_60px_rgba(0,0,0,0.95)]"
+            className="font-serif text-8xl sm:text-9xl md:text-[12.5rem] lg:text-[15.5rem] xl:text-[17rem] px-4 leading-[0.76] tracking-[-0.04em] text-paper text-center drop-shadow-[0_25px_60px_rgba(0,0,0,0.95)]"
           >
             <span className="block opacity-95">The</span>
-            <span className="italic font-light opacity-90 -mt-6 md:-mt-10 block">Chapters</span>
+            <span className="italic font-light opacity-90 -mt-8 md:-mt-12 lg:-mt-16 block">Chapters</span>
           </motion.h1>
         </div>
       </div>
