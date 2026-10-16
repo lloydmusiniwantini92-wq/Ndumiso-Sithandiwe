@@ -727,10 +727,10 @@ function Home() {
           <Link 
             to="/journey" 
             onClick={triggerCrescendo}
-            className="group flex items-center gap-6 font-sans text-[11px] tracking-[0.35em] uppercase border border-paper/20 px-10 py-5 rounded-full hover:bg-paper hover:text-ink transition-all duration-500"
+            className="group flex items-center gap-3.5 md:gap-6 font-sans text-[10px] md:text-[11px] tracking-[0.28em] md:tracking-[0.35em] uppercase border border-paper/20 px-6 py-3.5 md:px-10 md:py-5 rounded-full hover:bg-paper hover:text-ink transition-all duration-500 whitespace-nowrap backdrop-blur-sm bg-black/20 md:bg-transparent"
           >
             <span>Enter the Story</span>
-            <ArrowRight className="w-7 h-5 md:w-5 md:h-5 transition-transform group-hover:translate-x-3 stroke-[2.8] md:stroke-[2] scale-x-125 md:scale-x-100 origin-left" />
+            <ArrowRight className="w-5 h-4 md:w-5 md:h-5 transition-transform group-hover:translate-x-3 stroke-[2.6] md:stroke-[2] scale-x-120 md:scale-x-100 origin-left" />
           </Link>
         </MagneticWrapper>
       </motion.div>
