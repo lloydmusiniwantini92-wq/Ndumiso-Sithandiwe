@@ -949,7 +949,7 @@ function Details() {
         ].map(({ pos, rot }, i) => (
           <div
             key={i}
-            className={`absolute ${pos} w-[34rem] h-[34rem] pointer-events-none transform ${rot}`}
+            className={`hidden md:block absolute ${pos} w-[34rem] h-[34rem] pointer-events-none transform ${rot}`}
             style={{ mixBlendMode: 'lighten' }}
           >
             {/* Soft halo (depth) */}
