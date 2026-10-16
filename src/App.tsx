@@ -808,9 +808,7 @@ function Journey() {
     "/photos/couple-gazing-smile.jpg",
     "/photos/couple-standing-smile.jpg",
     "/photos/couple-back-to-back.jpg",
-    "/photos/couple-seated-standing.jpg",
-    "/photos/graduation-portrait-1.jpg",
-    "/photos/graduation-portrait-2.jpg"
+    "/photos/couple-seated-standing.jpg"
   ];
 
   useEffect(() => {
