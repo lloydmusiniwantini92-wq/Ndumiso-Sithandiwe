@@ -801,14 +801,23 @@ function ChaptersBackdrop({ targetRef }: { targetRef: React.RefObject<HTMLElemen
   const softFocus   = useTransform(reveal, [0.25, 0.9], [1, 0]);     // blurred copy fades out = focus pull
   const darkness    = useTransform(reveal, [0, 0.85], [0.9, 0.1]);   // emerges from black to a light veil
 
-  // Velocity-driven micro-jitter (subtle, springy, returns to rest)
+  // Logarithmic damping for ultra-smooth fluid inertia (no discrete twitching)
   const { scrollY } = useScroll();
   const velocity = useVelocity(scrollY);
-  const shake = useSpring(velocity, { stiffness: 420, damping: 14, mass: 0.6 });
-  const jitterY = useTransform(shake, [-2500, 0, 2500], [-6, 0, 6], { clamp: true });
-  const jitterX = useTransform(shake, [-2500, 0, 2500], [1.5, 0, -1.5], { clamp: true });
-  const jitterR = useTransform(shake, [-2500, 0, 2500], [-0.12, 0, 0.12], { clamp: true });
-  const jitterS = useTransform(shake, [-2500, 0, 2500], [1.008, 1, 1.008], { clamp: true });
+
+  // 1. Logarithmic compression: filters out micro-noise (< 25px/s) and scales logarithmically
+  const logVelocity = useTransform(velocity, (v) => {
+    const abs = Math.abs(v);
+    if (abs < 25) return 0; // deadzone to prevent tiny mouse twitching
+    return Math.sign(v) * Math.log1p(abs / 250);
+  });
+
+  // 2. Overdamped spring: ensures zero oscillation, zero jitter, pure liquid absorption
+  const smoothInertia = useSpring(logVelocity, { stiffness: 35, damping: 30, mass: 1.2 });
+
+  // 3. Ultra-subtle fluid cushion: max ±2px gentle give that glides back to rest
+  const inertiaY = useTransform(smoothInertia, [-4, 0, 4], [-2, 0, 2], { clamp: true });
+  const inertiaScale = useTransform(smoothInertia, (val) => 1 + Math.abs(val) * 0.0008);
 
   const imgSrc = '/photos/couple-embrace-direct.jpg';
 
@@ -819,10 +828,10 @@ function ChaptersBackdrop({ targetRef }: { targetRef: React.RefObject<HTMLElemen
         className="absolute inset-0 will-change-transform"
         style={reduceMotion ? { opacity: imageOpacity } : { opacity: imageOpacity, scale: pushIn, y: rise }}
       >
-        {/* Jitter layer: tiny camera shake while scrolling */}
+        {/* Liquid inertia layer: zero jitter, purely damped logarithmic glide */}
         <motion.div
           className="absolute inset-0 will-change-transform"
-          style={reduceMotion ? undefined : { x: jitterX, y: jitterY, rotate: jitterR, scale: jitterS }}
+          style={reduceMotion ? undefined : { y: inertiaY, scale: inertiaScale }}
         >
           {/* Sharp plate */}
           <img

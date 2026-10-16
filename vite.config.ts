@@ -21,6 +21,9 @@ export default defineConfig(({mode}) => {
       hmr: process.env.DISABLE_HMR !== 'true',
       allowedHosts: true,
       port: 3001,
+      watch: {
+        ignored: ['**/dist/**', '**/*.mp4', '**/*.m4a', '**/*.mp3', '**/*.jpg', '**/*.png'],
+      },
     },
   };
 });
