@@ -422,8 +422,6 @@ function TimelineItem({ item, index }: { item: any, index: number }) {
   const [isLiked, setIsLiked] = useState(false);
   const [likesCount, setLikesCount] = useState(item.likes);
   const [isExpanded, setIsExpanded] = useState(false);
-  const containerRef = useRef(null);
-  const isInView = useInView(containerRef, { margin: "-40% 0px -40% 0px" });
 
   const toggleLike = () => {
     setLikesCount((prev: number) => isLiked ? prev - 1 : prev + 1);
@@ -433,72 +431,41 @@ function TimelineItem({ item, index }: { item: any, index: number }) {
   const isEven = index % 2 === 0;
 
   return (
-    <motion.div ref={containerRef} layout className={`w-full flex flex-col ${isEven ? 'md:flex-row' : 'md:flex-row-reverse'} items-center justify-between gap-12 md:gap-24 my-32 md:my-48 relative z-10 max-w-[80rem] mx-auto px-6`}>
+    <div className={`w-full flex flex-col ${isEven ? 'md:flex-row' : 'md:flex-row-reverse'} items-center justify-between gap-12 md:gap-24 my-28 md:my-44 relative z-10 max-w-[80rem] mx-auto px-6`}>
       
       {/* Central Connecting Stem Line */}
-      <div className="absolute left-1/2 top-[-30%] bottom-[-30%] w-px bg-ink/10 -translate-x-1/2 hidden md:block z-0">
-        {/* Pulsing Stem Glow */}
-        <motion.div 
-          animate={isInView ? { opacity: [0, 1, 0] } : { opacity: 0 }}
-          transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
-          className="w-full h-full bg-gradient-to-b from-transparent via-[#DFB78C] to-transparent blur-[1px]"
-        />
+      <div className="absolute left-1/2 top-[-25%] bottom-[-25%] w-px bg-ink/10 -translate-x-1/2 hidden md:block z-0 pointer-events-none">
+        <div className="w-full h-full bg-gradient-to-b from-transparent via-[#DFB78C]/35 to-transparent blur-[1px]" />
       </div>
       
       {/* Central Dot Node */}
-      <div className="hidden md:block absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-10">
-        {/* Pulsing Dot Halo */}
-        <motion.div 
-          animate={isInView ? { scale: [1, 2.5, 1], opacity: [0, 0.6, 0] } : { scale: 1, opacity: 0 }}
-          transition={{ duration: 3, repeat: Infinity, ease: "easeInOut", delay: 0.2 }}
-          className="absolute inset-0 rounded-full bg-[#DFB78C] blur-[4px]"
-        />
-        <motion.div 
-          initial={{ scale: 0 }}
-          whileInView={{ scale: 1 }}
-          viewport={{ once: true, amount: 0.5 }}
-          transition={{ duration: 0.8, delay: 0.2, type: "spring" }}
-          className="w-4 h-4 rounded-full bg-ink border-[3px] border-paper shadow-xl relative z-10 will-change-transform" 
-        />
+      <div className="hidden md:block absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-10 pointer-events-none">
+        <div className="absolute -inset-2 rounded-full bg-[#DFB78C]/25 blur-[4px]" />
+        <div className="w-4 h-4 rounded-full bg-ink border-[3px] border-paper shadow-xl relative z-10" />
       </div>
 
       {/* Massive Background Number */}
-      <motion.div 
-        initial={{ opacity: 0, x: isEven ? 50 : -50 }}
-        whileInView={{ opacity: 1, x: 0 }}
-        viewport={{ once: true, amount: 0.5 }}
-        transition={{ duration: 1.5, ease: "easeOut" }}
-        className={`absolute top-1/2 -translate-y-1/2 ${isEven ? 'right-0 md:right-auto md:left-[55%]' : 'left-0 md:left-auto md:right-[55%]'} text-[12rem] md:text-[20rem] font-serif italic leading-none text-ink/[0.03] select-none pointer-events-none z-0 will-change-transform`}
+      <div 
+        className={`absolute top-1/2 -translate-y-1/2 ${isEven ? 'right-0 md:right-auto md:left-[55%]' : 'left-0 md:left-auto md:right-[55%]'} text-[12rem] md:text-[20rem] font-serif italic leading-none text-ink/[0.03] select-none pointer-events-none z-0`}
       >
         0{index + 1}
-      </motion.div>
+      </div>
 
       {/* Image Block (Expanding) */}
       <motion.div 
-        layout
-        initial={{ opacity: 0, y: 50 }}
+        initial={{ opacity: 0, y: 35 }}
         whileInView={{ opacity: 1, y: 0 }}
-        viewport={{ once: true, amount: 0.3 }}
-        transition={{ duration: 1, ease: "easeOut" }}
+        viewport={{ once: true, margin: "-60px" }}
+        transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
         className={`relative z-40 cursor-pointer ${isExpanded ? 'w-full h-[75vh]' : 'w-full md:w-[45%] aspect-[4/5]'}`}
         onClick={() => setIsExpanded(!isExpanded)}
       >
-        {/* Pulsing Card Halo (Cascade Delay 0.5s) */}
-        {!isExpanded && (
-          <motion.div 
-            animate={isInView ? { opacity: [0, 1, 0] } : { opacity: 0 }}
-            transition={{ duration: 3, repeat: Infinity, ease: "easeInOut", delay: 0.5 }}
-            className="absolute -inset-6 bg-[#DFB78C]/15 blur-2xl rounded-[3rem] -z-10 pointer-events-none"
-          />
-        )}
-        
-        <motion.div layout className={`relative w-full h-full rounded-[2rem] overflow-hidden group shadow-2xl bg-paper will-change-transform ${isExpanded ? 'border border-ink/5' : ''}`}>
-          <motion.img
-            layout
+        <div className={`relative w-full h-full rounded-[2rem] overflow-hidden group shadow-2xl bg-paper will-change-transform ${isExpanded ? 'border border-ink/5' : ''}`}>
+          <img
             src={item.image}
             alt={item.date}
             loading="lazy"
-            className={`w-full h-full transition-transform duration-[2s] ${isExpanded ? 'object-cover object-[center_20%]' : 'object-cover object-[center_20%] group-hover:scale-105'}`}
+            className={`w-full h-full transition-transform duration-700 ${isExpanded ? 'object-cover object-[center_20%]' : 'object-cover object-[center_20%] group-hover:scale-105'}`}
             referrerPolicy="no-referrer"
           />
           {/* Subtle Hover Overlay */}
@@ -511,7 +478,7 @@ function TimelineItem({ item, index }: { item: any, index: number }) {
           <AnimatePresence>
             {isExpanded && (
               <motion.div 
-                initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ delay: 0.4 }}
+                initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ delay: 0.2 }}
                 className="absolute top-6 right-6 z-50"
               >
                 <div className="font-sans text-[9px] tracking-[0.4em] uppercase text-ink bg-paper/90 backdrop-blur-md px-6 py-4 rounded-full border border-ink/10 shadow-lg flex items-center gap-3">
@@ -522,28 +489,19 @@ function TimelineItem({ item, index }: { item: any, index: number }) {
               </motion.div>
             )}
           </AnimatePresence>
-        </motion.div>
+        </div>
       </motion.div>
 
       {/* Text Content Block */}
-      <AnimatePresence mode="popLayout">
+      <AnimatePresence>
         {!isExpanded && (
           <motion.div
-            layout
-            initial={{ opacity: 0, x: isEven ? -50 : 50 }}
-            whileInView={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, scale: 0.9 }}
-            viewport={{ once: true, amount: 0.3 }}
-            transition={{ duration: 0.8, ease: "easeOut" }}
-            className={`w-full md:w-[45%] relative z-30 flex flex-col ${isEven ? 'items-start' : 'items-end text-right'} will-change-transform`}
+            initial={{ opacity: 0, y: 35 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, margin: "-60px" }}
+            transition={{ duration: 0.8, delay: 0.1, ease: [0.16, 1, 0.3, 1] }}
+            className={`w-full md:w-[45%] relative z-30 flex flex-col ${isEven ? 'items-start' : 'items-end text-right'}`}
           >
-            {/* Pulsing Card Halo (Cascade Delay 0.5s) */}
-            <motion.div 
-              animate={isInView ? { opacity: [0, 1, 0] } : { opacity: 0 }}
-              transition={{ duration: 3, repeat: Infinity, ease: "easeInOut", delay: 0.5 }}
-              className="absolute -inset-6 bg-[#DFB78C]/15 blur-2xl rounded-[3rem] -z-10 pointer-events-none"
-            />
-            
             <div className="bg-paper p-10 md:p-14 shadow-xl border border-ink/5 rounded-[2rem] w-full relative overflow-hidden group">
               <div className="absolute inset-0 opacity-[0.02] pointer-events-none" style={{ backgroundImage: 'url("data:image/svg+xml,%3Csvg viewBox=%220 0 200 200%22 xmlns=%22http://www.w3.org/2000/svg%22%3E%3Cfilter id=%22noise%22%3E%3CfeTurbulence type=%22fractalNoise%22 baseFrequency=%220.8%22 numOctaves=%223%22 stitchTiles=%22stitch%22/%3E%3C/filter%3E%3Crect width=%22100%25%22 height=%22100%25%22 filter=%22url(%23noise)%22/%3E%3C/svg%3E")' }} />
 
@@ -562,7 +520,7 @@ function TimelineItem({ item, index }: { item: any, index: number }) {
               <div className={`flex items-center gap-4 ${isEven ? 'justify-start' : 'justify-end'}`}>
                 <MagneticWrapper>
                   <motion.button
-                    whileTap={{ scale: 0.8 }}
+                    whileTap={{ scale: 0.85 }}
                     onClick={(e) => { e.stopPropagation(); toggleLike(); }}
                     className={`transition-all duration-300 p-3 rounded-full border ${isLiked ? 'border-rose-400/30 text-rose-500 bg-rose-50' : 'border-ink/15 text-ink/40 hover:border-ink/50 hover:text-ink'}`}
                   >
@@ -578,7 +536,7 @@ function TimelineItem({ item, index }: { item: any, index: number }) {
           </motion.div>
         )}
       </AnimatePresence>
-    </motion.div>
+    </div>
   );
 }
 
@@ -772,7 +730,7 @@ function Home() {
             className="group flex items-center gap-6 font-sans text-[11px] tracking-[0.35em] uppercase border border-paper/20 px-10 py-5 rounded-full hover:bg-paper hover:text-ink transition-all duration-500"
           >
             <span>Enter the Story</span>
-            <ArrowRight className="w-5 h-5 transition-transform group-hover:translate-x-3" />
+            <ArrowRight className="w-7 h-5 md:w-5 md:h-5 transition-transform group-hover:translate-x-3 stroke-[2.8] md:stroke-[2] scale-x-125 md:scale-x-100 origin-left" />
           </Link>
         </MagneticWrapper>
       </motion.div>
@@ -781,81 +739,50 @@ function Home() {
 }
 
 // --- Cinematic Chapters Backdrop ---------------------------------------------
-// Scroll-linked reveal: as the Chapters section rises into view the photo
-// emerges from darkness, pulls focus (soft -> sharp) and settles from a slow
-// 1.14x push-in to 1x. Once the section reaches the top, every value locks and
-// the image is fully static. While scrolling, a spring-damped "handheld camera"
-// micro-jitter follows scroll velocity and settles back to stillness on stop.
-// Perf: only opacity/transform are animated (GPU composited); filters are
-// static per layer; honours prefers-reduced-motion.
+// Rock-solid smooth reveal: fades in and settles gently from 1.05x to 1x without
+// any vertical bobbing, spring jitter, or scroll resistance. Locks completely static.
 function ChaptersBackdrop({ targetRef }: { targetRef: React.RefObject<HTMLElement | null> }) {
   const reduceMotion = useReducedMotion();
 
-  // 0 when the section's top hits the viewport bottom, 1 when it reaches the top
+  // 0 when section enters, 1 when it aligns at top
   const { scrollYProgress } = useScroll({ target: targetRef, offset: ['start end', 'start start'] });
-  // Weighty, film-like lag on the reveal
-  const reveal = useSpring(scrollYProgress, { stiffness: 55, damping: 22, mass: 0.9, restDelta: 0.0005 });
+  const reveal = useSpring(scrollYProgress, { stiffness: 90, damping: 28, mass: 0.6, restDelta: 0.001 });
 
-  const imageOpacity = useTransform(reveal, [0, 0.15, 1], [0, 0.35, 1]);
-  const pushIn      = useTransform(reveal, [0, 1], [1.14, 1]);
-  const rise        = useTransform(reveal, [0, 1], ['5%', '0%']);
-  const softFocus   = useTransform(reveal, [0.25, 0.9], [1, 0]);     // blurred copy fades out = focus pull
-  const darkness    = useTransform(reveal, [0, 0.85], [0.9, 0.1]);   // emerges from black to a light veil
-
-  // Logarithmic damping for ultra-smooth fluid inertia (no discrete twitching)
-  const { scrollY } = useScroll();
-  const velocity = useVelocity(scrollY);
-
-  // 1. Logarithmic compression: filters out micro-noise (< 25px/s) and scales logarithmically
-  const logVelocity = useTransform(velocity, (v) => {
-    const abs = Math.abs(v);
-    if (abs < 25) return 0; // deadzone to prevent tiny mouse twitching
-    return Math.sign(v) * Math.log1p(abs / 250);
-  });
-
-  // 2. Overdamped spring: ensures zero oscillation, zero jitter, pure liquid absorption
-  const smoothInertia = useSpring(logVelocity, { stiffness: 35, damping: 30, mass: 1.2 });
-
-  // 3. Ultra-subtle fluid cushion: max ±2px gentle give that glides back to rest
-  const inertiaY = useTransform(smoothInertia, [-4, 0, 4], [-2, 0, 2], { clamp: true });
-  const inertiaScale = useTransform(smoothInertia, (val) => 1 + Math.abs(val) * 0.0008);
+  const imageOpacity = useTransform(reveal, [0, 0.2, 1], [0, 0.45, 1]);
+  const pushIn = useTransform(reveal, [0, 1], [1.05, 1]);
+  const softFocus = useTransform(reveal, [0.2, 0.85], [1, 0]);
+  const darkness = useTransform(reveal, [0, 0.85], [0.85, 0.1]);
 
   const imgSrc = '/photos/couple-embrace-direct.jpg';
 
   return (
     <div className="fixed inset-0 z-0 pointer-events-none overflow-hidden bg-ink" aria-hidden="true">
-      {/* Reveal layer: opacity + push-in + rise */}
+      {/* Reveal layer: opacity + push-in */}
       <motion.div
         className="absolute inset-0 will-change-transform"
-        style={reduceMotion ? { opacity: imageOpacity } : { opacity: imageOpacity, scale: pushIn, y: rise }}
+        style={reduceMotion ? { opacity: imageOpacity } : { opacity: imageOpacity, scale: pushIn }}
       >
-        {/* Liquid inertia layer: zero jitter, purely damped logarithmic glide */}
-        <motion.div
-          className="absolute inset-0 will-change-transform"
-          style={reduceMotion ? undefined : { y: inertiaY, scale: inertiaScale }}
-        >
-          {/* Sharp plate */}
-          <img
+        {/* Sharp plate */}
+        <img
+          src={imgSrc}
+          alt=""
+          decoding="async"
+          className="couple-backdrop"
+          style={{ filter: 'blur(1.5px) brightness(0.9) contrast(1.05)' }}
+        />
+        {/* Soft-focus plate (smoothly fades out as focus sharpens) */}
+        {!reduceMotion && (
+          <motion.img
             src={imgSrc}
             alt=""
             decoding="async"
             className="couple-backdrop"
-            style={{ filter: 'blur(1.5px) brightness(0.9) contrast(1.05)' }}
+            style={{ opacity: softFocus, filter: 'blur(12px) brightness(0.85)' }}
           />
-          {/* Soft-focus plate (static blur, only its opacity animates) */}
-          {!reduceMotion && (
-            <motion.img
-              src={imgSrc}
-              alt=""
-              decoding="async"
-              className="couple-backdrop"
-              style={{ opacity: softFocus, filter: 'blur(14px) brightness(0.85)' }}
-            />
-          )}
-        </motion.div>
+        )}
       </motion.div>
 
-      {/* Darkness veil: deep at entry, settles to a light 10% veil */}
+      {/* Darkness veil: settles to a light 10% veil */}
       <motion.div className="absolute inset-0 bg-ink" style={{ opacity: darkness }} />
 
       {/* Cinematic vignette */}
