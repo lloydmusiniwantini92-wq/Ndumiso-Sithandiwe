@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useState, createContext, useContext } from 'react';
-import { motion, AnimatePresence, useScroll, useTransform, useMotionValue, useSpring, useInView } from 'motion/react';
+import { motion, AnimatePresence, useScroll, useTransform, useMotionValue, useSpring, useInView, useVelocity, useReducedMotion } from 'motion/react';
 import { BrowserRouter, Routes, Route, Link, useLocation } from 'react-router-dom';
 import { Heart, ArrowRight, Menu, X, Volume2, VolumeX } from 'lucide-react';
 
@@ -779,11 +779,90 @@ function Home() {
 );
 }
 
+// --- Cinematic Chapters Backdrop ---------------------------------------------
+// Scroll-linked reveal: as the Chapters section rises into view the photo
+// emerges from darkness, pulls focus (soft -> sharp) and settles from a slow
+// 1.14x push-in to 1x. Once the section reaches the top, every value locks and
+// the image is fully static. While scrolling, a spring-damped "handheld camera"
+// micro-jitter follows scroll velocity and settles back to stillness on stop.
+// Perf: only opacity/transform are animated (GPU composited); filters are
+// static per layer; honours prefers-reduced-motion.
+function ChaptersBackdrop({ targetRef }: { targetRef: React.RefObject<HTMLElement | null> }) {
+  const reduceMotion = useReducedMotion();
+
+  // 0 when the section's top hits the viewport bottom, 1 when it reaches the top
+  const { scrollYProgress } = useScroll({ target: targetRef, offset: ['start end', 'start start'] });
+  // Weighty, film-like lag on the reveal
+  const reveal = useSpring(scrollYProgress, { stiffness: 55, damping: 22, mass: 0.9, restDelta: 0.0005 });
+
+  const imageOpacity = useTransform(reveal, [0, 0.15, 1], [0, 0.35, 1]);
+  const pushIn      = useTransform(reveal, [0, 1], [1.14, 1]);
+  const rise        = useTransform(reveal, [0, 1], ['5%', '0%']);
+  const softFocus   = useTransform(reveal, [0.25, 0.9], [1, 0]);     // blurred copy fades out = focus pull
+  const darkness    = useTransform(reveal, [0, 0.85], [0.9, 0.1]);   // emerges from black to a light veil
+
+  // Velocity-driven micro-jitter (subtle, springy, returns to rest)
+  const { scrollY } = useScroll();
+  const velocity = useVelocity(scrollY);
+  const shake = useSpring(velocity, { stiffness: 420, damping: 14, mass: 0.6 });
+  const jitterY = useTransform(shake, [-2500, 0, 2500], [-6, 0, 6], { clamp: true });
+  const jitterX = useTransform(shake, [-2500, 0, 2500], [1.5, 0, -1.5], { clamp: true });
+  const jitterR = useTransform(shake, [-2500, 0, 2500], [-0.12, 0, 0.12], { clamp: true });
+  const jitterS = useTransform(shake, [-2500, 0, 2500], [1.008, 1, 1.008], { clamp: true });
+
+  const imgSrc = '/photos/couple-embrace-direct.jpg';
+
+  return (
+    <div className="fixed inset-0 z-0 pointer-events-none overflow-hidden bg-ink" aria-hidden="true">
+      {/* Reveal layer: opacity + push-in + rise */}
+      <motion.div
+        className="absolute inset-0 will-change-transform"
+        style={reduceMotion ? { opacity: imageOpacity } : { opacity: imageOpacity, scale: pushIn, y: rise }}
+      >
+        {/* Jitter layer: tiny camera shake while scrolling */}
+        <motion.div
+          className="absolute inset-0 will-change-transform"
+          style={reduceMotion ? undefined : { x: jitterX, y: jitterY, rotate: jitterR, scale: jitterS }}
+        >
+          {/* Sharp plate */}
+          <img
+            src={imgSrc}
+            alt=""
+            decoding="async"
+            className="couple-backdrop"
+            style={{ filter: 'blur(1.5px) brightness(0.9) contrast(1.05)' }}
+          />
+          {/* Soft-focus plate (static blur, only its opacity animates) */}
+          {!reduceMotion && (
+            <motion.img
+              src={imgSrc}
+              alt=""
+              decoding="async"
+              className="couple-backdrop"
+              style={{ opacity: softFocus, filter: 'blur(14px) brightness(0.85)' }}
+            />
+          )}
+        </motion.div>
+      </motion.div>
+
+      {/* Darkness veil: deep at entry, settles to a light 10% veil */}
+      <motion.div className="absolute inset-0 bg-ink" style={{ opacity: darkness }} />
+
+      {/* Cinematic vignette */}
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,transparent_55%,rgba(5,5,5,0.55)_100%)]" />
+
+      {/* Film grain */}
+      <div className="absolute inset-0 opacity-[0.04] mix-blend-overlay" style={{ backgroundImage: 'url("data:image/svg+xml,%3Csvg viewBox=%220 0 200 200%22 xmlns=%22http://www.w3.org/2000/svg%22%3E%3Cfilter id=%22noise%22%3E%3CfeTurbulence type=%22fractalNoise%22 baseFrequency=%221.5%22 numOctaves=%223%22 stitchTiles=%22stitch%22/%3E%3C/filter%3E%3Crect width=%22100%25%22 height=%22100%25%22 filter=%22url(%23noise)%22/%3E%3C/svg%3E")' }} />
+    </div>
+  );
+}
+
 function Journey() {
   const { scrollYProgress } = useScroll();
   const heroY = useTransform(scrollYProgress, [0, 1], ["0%", "50%"]);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [selectedItem, setSelectedItem] = useState<any | null>(null);
+  const chaptersRef = useRef<HTMLElement>(null);
 
   const carouselImages = [
     "/photos/couple-embrace-ring.jpg",
@@ -870,20 +949,9 @@ function Journey() {
           clip-path: inset(0) makes this section a "window": the fixed image inside
           stays pinned to the viewport (static, like /details) but is only visible
           between the hero and the footer. */}
-      <section className="relative w-full flex-grow bg-ink" style={{ clipPath: 'inset(0)' }}>
-        {/* Background Image: identical framing to /details, ~90% visible */}
-        <div className="fixed inset-0 z-0 pointer-events-none overflow-hidden">
-          <img 
-            src="/photos/couple-embrace-direct.jpg" 
-            alt="Chapters Backdrop"
-            className="couple-backdrop"
-            style={{ filter: 'blur(1.5px) brightness(0.9) contrast(1.05)' }}
-          />
-          {/* Light veil only - keeps the photo ~90% visible while the paper cards stay crisp */}
-          <div className="absolute inset-0 bg-ink/10" />
-          {/* Subtle noise */}
-          <div className="absolute inset-0 opacity-[0.03] mix-blend-overlay" style={{ backgroundImage: 'url("data:image/svg+xml,%3Csvg viewBox=%220 0 200 200%22 xmlns=%22http://www.w3.org/2000/svg%22%3E%3Cfilter id=%22noise%22%3E%3CfeTurbulence type=%22fractalNoise%22 baseFrequency=%221.5%22 numOctaves=%223%22 stitchTiles=%22stitch%22/%3E%3C/filter%3E%3Crect width=%22100%25%22 height=%22100%25%22 filter=%22url(%23noise)%22/%3E%3C/svg%3E")' }} />
-        </div>
+      <section ref={chaptersRef} className="relative w-full flex-grow bg-ink" style={{ clipPath: 'inset(0)' }}>
+        {/* Background Image: identical framing to /details, cinematic reveal on scroll */}
+        <ChaptersBackdrop targetRef={chaptersRef} />
 
         <main className="w-full max-w-[90rem] mx-auto relative py-20 lg:py-32 px-6 md:px-12 lg:px-24 z-10">
           <div className="relative z-10 w-full mt-10 mb-40">
