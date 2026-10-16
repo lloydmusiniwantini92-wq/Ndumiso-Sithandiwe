@@ -1,0 +1,73 @@
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400;1,500&family=Inter:wght@300;400;500&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-serif: "Cormorant Garamond", ui-serif, Georgia, Cambria, "Times New Roman", Times, serif;
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --color-ink: #050505;
+  --color-paper: #FAFAFA;
+  --color-gray: #888888;
+}
+
+body {
+  background-color: var(--color-paper);
+  color: var(--color-ink);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  /* Hide default cursor on desktop — custom cursor is rendered via JS */
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-ink) var(--color-paper);
+}
+
+@media (pointer: fine) {
+  body { cursor: none; }
+  a, button { cursor: none; }
+}
+
+/* Hide scrollbar for a cleaner, editorial look */
+::-webkit-scrollbar {
+  width: 4px;
+}
+::-webkit-scrollbar-track {
+  background: var(--color-paper);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--color-ink);
+  border-radius: 0px;
+}
+
+/* Custom selection color */
+::selection {
+  background: var(--color-ink);
+  color: var(--color-paper);
+}
+
+/* ------------------------------------------------------------------
+   Couple backdrop framing (couple-embrace-direct.jpg, 1638x2048).
+   Shared by /details and the /journey Chapters section so both are
+   framed identically: both faces centred, pinned to the viewport.
+   Focal point = midpoint between his head (~43% x) and her face
+   (~69% x)  ->  56% x, 21% y of the photo.
+   ------------------------------------------------------------------ */
+.couple-backdrop {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  object-fit: cover;
+  object-position: 60% 16%; /* portrait / mobile */
+}
+
+@media (min-aspect-ratio: 1/1) {
+  .couple-backdrop {
+    inset: auto;
+    left: 50%;
+    top: 50%;
+    /* Wide enough to pan horizontally, never leaves a gap at any landscape ratio */
+    width: max(139vw, 178vh);
+    height: auto;
+    object-fit: fill;
+    transform: translate(-56%, -21%);
+  }
+}
