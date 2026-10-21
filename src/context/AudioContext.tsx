@@ -57,49 +57,72 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
     audio.volume = 0.35;
     audioRef.current = audio;
 
-    // Attempt automatic playback on load
-    const startAudio = () => {
-      audio
+    const events = ['click', 'pointerdown', 'touchend', 'keydown'];
+
+    const removeListeners = () => {
+      events.forEach((evt) => {
+        document.removeEventListener(evt, unlockHandler, true);
+        window.removeEventListener(evt, unlockHandler, true);
+      });
+    };
+
+    const unlockHandler = (e: Event) => {
+      const target = e.target as HTMLElement | null;
+      // If the user explicitly clicked the speaker button, let toggleMute handle it
+      if (target?.closest('button[data-audio-btn]')) {
+        removeListeners();
+        return;
+      }
+
+      const currentAudio = audioRef.current;
+      if (!currentAudio) return;
+
+      if (!currentAudio.paused) {
+        removeListeners();
+        return;
+      }
+
+      currentAudio.volume = 0.05;
+      currentAudio
         .play()
         .then(() => {
           setIsMuted(false);
           setHasInteracted(true);
+          fadeVolume(currentAudio, 0.35, 1200);
+          removeListeners();
         })
         .catch(() => {
-          // If modern browser autoplay policy halts un-gestured audio,
-          // unlock immediately on the very first touch/scroll/click/key
-          const unlock = (e: Event) => {
-            const target = e.target as HTMLElement | null;
-            if (target?.closest('button[data-audio-btn]')) return;
-
-            if (audioRef.current && audioRef.current.paused) {
-              audioRef.current.volume = 0.35;
-              audioRef.current
-                .play()
-                .then(() => {
-                  setIsMuted(false);
-                  setHasInteracted(true);
-                })
-                .catch(console.error);
-            }
-            window.removeEventListener('pointerdown', unlock);
-            window.removeEventListener('click', unlock);
-            window.removeEventListener('touchstart', unlock);
-            window.removeEventListener('scroll', unlock);
-            window.removeEventListener('keydown', unlock);
-          };
-
-          window.addEventListener('pointerdown', unlock, { once: true });
-          window.addEventListener('click', unlock, { once: true });
-          window.addEventListener('touchstart', unlock, { once: true });
-          window.addEventListener('scroll', unlock, { once: true });
-          window.addEventListener('keydown', unlock, { once: true });
+          // Keep listeners active if the browser did not treat this event as a valid activation
         });
     };
 
-    startAudio();
+    const attachListeners = () => {
+      events.forEach((evt) => {
+        document.addEventListener(evt, unlockHandler, {
+          capture: true,
+          passive: true,
+        });
+        window.addEventListener(evt, unlockHandler, {
+          capture: true,
+          passive: true,
+        });
+      });
+    };
+
+    // Attempt automatic playback on load
+    audio
+      .play()
+      .then(() => {
+        setIsMuted(false);
+        setHasInteracted(true);
+      })
+      .catch(() => {
+        // Browser autoplay policy blocked un-gestured audio; unlock on very first tap/click anywhere
+        attachListeners();
+      });
 
     return () => {
+      removeListeners();
       audio.pause();
       audio.src = '';
     };
