@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
-import { Link } from 'react-router-dom';
-import { Heart, ArrowRight, CheckCircle2 } from 'lucide-react';
+import { Link, useNavigate } from 'react-router-dom';
+import { Heart, ArrowRight, CheckCircle2, Sparkles } from 'lucide-react';
 import { MagneticWrapper } from '../components/MagneticWrapper';
 import { weddingEventConfig } from '../data/weddingData';
 
@@ -17,6 +17,7 @@ const pageVariants = {
 };
 
 export const Rsvp: React.FC = () => {
+  const navigate = useNavigate();
   const [rsvpData, setRsvpData] = useState({
     name: '',
     email: '',
@@ -26,6 +27,25 @@ export const Rsvp: React.FC = () => {
   });
   const [rsvpSubmitted, setRsvpSubmitted] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [redirectCountdown, setRedirectCountdown] = useState(4);
+
+  // When form is submitted via this custom route, automatically route to the Home page
+  useEffect(() => {
+    if (!rsvpSubmitted) return;
+
+    const interval = setInterval(() => {
+      setRedirectCountdown((prev) => {
+        if (prev <= 1) {
+          clearInterval(interval);
+          navigate('/');
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [rsvpSubmitted, navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -61,15 +81,16 @@ export const Rsvp: React.FC = () => {
       transition={tSettings}
       className="min-h-screen bg-ink text-paper relative flex flex-col justify-center items-center py-20 px-4 sm:px-6"
     >
-      {/* Fixed Luxury Background Image matching Details */}
+      {/* Fixed Luxury Background Image - Highly Visible & Vibrant */}
       <div className="fixed inset-0 z-0 pointer-events-none bg-ink overflow-hidden">
         <img
           src="/photos/couple-embrace-direct.jpg"
           alt="Ndumiso & Sithandiwe"
-          className="w-full h-full object-cover object-[center_20%] opacity-40 brightness-75 scale-105"
+          className="w-full h-full object-cover object-[center_12%] opacity-85 brightness-95 scale-100 will-change-transform"
         />
-        <div className="absolute inset-0 bg-gradient-to-b from-ink/80 via-ink/60 to-ink/90" />
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,transparent_40%,rgba(5,5,5,0.75)_100%)]" />
+        {/* Soft, delicate vignette allowing the couple's portrait to shine through */}
+        <div className="absolute inset-0 bg-gradient-to-b from-ink/35 via-transparent to-ink/75" />
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,transparent_45%,rgba(5,5,5,0.65)_100%)]" />
       </div>
 
       {/* Main Centered RSVP Form Card */}
@@ -78,7 +99,7 @@ export const Rsvp: React.FC = () => {
           initial={{ opacity: 0, y: 30 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.8, delay: 0.2 }}
-          className="bg-[#0E0E0E]/90 backdrop-blur-xl border border-[#E8D3B9]/30 rounded-3xl p-6 sm:p-10 md:p-12 shadow-[0_25px_80px_rgba(0,0,0,0.9)]"
+          className="bg-[#0E0E0E]/85 backdrop-blur-xl border border-[#E8D3B9]/35 rounded-3xl p-6 sm:p-10 md:p-12 shadow-[0_25px_80px_rgba(0,0,0,0.95)]"
         >
           {/* Header */}
           <div className="text-center mb-8">
@@ -112,22 +133,24 @@ export const Rsvp: React.FC = () => {
               <h2 className="font-serif text-3xl text-paper mb-3 italic">
                 Response Recorded
               </h2>
-              <p className="font-sans text-xs tracking-wider text-paper/80 leading-relaxed max-w-sm mx-auto mb-8">
+              <p className="font-sans text-xs tracking-wider text-paper/85 leading-relaxed max-w-sm mx-auto mb-4">
                 Thank you for your response! Your RSVP has been saved directly to our guest list. We look forward to celebrating with you at Lakeside Events in Bulawayo!
               </p>
+              
+              {/* Auto-redirect notification pill */}
+              <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-paper/5 border border-[#E8D3B9]/30 text-[#E8D3B9] text-[10.5px] font-sans tracking-widest uppercase mb-8">
+                <Sparkles className="w-3.5 h-3.5 animate-spin" />
+                <span>Redirecting to celebration in {redirectCountdown}s...</span>
+              </div>
+
               <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
-                <Link
-                  to="/details"
-                  className="font-sans text-[11px] tracking-[0.3em] uppercase px-7 py-3 rounded-full bg-[#E8D3B9] text-ink font-bold hover:bg-[#FAF8F5] transition-colors"
+                <button
+                  type="button"
+                  onClick={() => navigate('/')}
+                  className="w-full sm:w-auto font-sans text-[11px] tracking-[0.3em] uppercase px-8 py-3.5 rounded-full bg-[#E8D3B9] text-ink font-bold hover:bg-[#FAF8F5] transition-all cursor-pointer shadow-[0_5px_20px_rgba(232,211,185,0.3)]"
                 >
-                  View Wedding Details
-                </Link>
-                <Link
-                  to="/"
-                  className="font-sans text-[11px] tracking-[0.3em] uppercase px-7 py-3 rounded-full border border-paper/30 text-paper hover:bg-paper/10 transition-colors"
-                >
-                  Return Home
-                </Link>
+                  Enter Celebration Now &rarr;
+                </button>
               </div>
             </motion.div>
           ) : (
