@@ -603,7 +603,7 @@ export const Details: React.FC = () => {
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
                 onClick={() => setIsRsvpModalOpen(false)}
-                className="fixed inset-0 z-[999] flex items-center justify-center p-4 md:p-6 bg-ink/85 backdrop-blur-2xl"
+                className="fixed inset-0 z-[999] flex items-center justify-center p-4 md:p-6 bg-ink/35 backdrop-blur-[2px]"
               >
                 <motion.div
                   initial={{ scale: 0.95, opacity: 0, y: 20 }}
@@ -611,7 +611,7 @@ export const Details: React.FC = () => {
                   exit={{ scale: 0.95, opacity: 0, y: 20 }}
                   transition={{ duration: 0.4, ease: [0.76, 0, 0.24, 1] }}
                   onClick={(e) => e.stopPropagation()}
-                  className="relative w-full max-w-lg max-h-[90vh] overflow-y-auto bg-[#0E0E0E] border border-[#E8D3B9]/30 rounded-3xl p-6 sm:p-8 md:p-12 shadow-[0_25px_80px_rgba(0,0,0,0.95)] text-paper"
+                  className="relative w-full max-w-lg max-h-[90vh] overflow-y-auto bg-[#0E0E0E]/90 backdrop-blur-xl border border-[#E8D3B9]/35 rounded-3xl p-6 sm:p-8 md:p-12 shadow-[0_25px_80px_rgba(0,0,0,0.95)] text-paper"
                 >
                   <button
                     type="button"
