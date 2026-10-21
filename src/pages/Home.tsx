@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowRight } from 'lucide-react';
+import { ArrowRight, Heart } from 'lucide-react';
 import { MagneticWrapper } from '../components/MagneticWrapper';
 import {
   carouselImages,
@@ -117,7 +117,7 @@ export const Home: React.FC = () => {
         initial={{ y: 20, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
         transition={{ delay: 1.2, duration: 1 }}
-        className="relative z-10 mb-8"
+        className="relative z-10 mb-6 sm:mb-8 flex flex-col items-center gap-3"
       >
         <MagneticWrapper>
           <button
@@ -129,6 +129,21 @@ export const Home: React.FC = () => {
               Explore Our Story
             </span>
             <ArrowRight className="w-4 h-4 text-[#E8D3B9] transition-transform duration-500 group-hover:translate-x-2" />
+          </button>
+        </MagneticWrapper>
+
+        {/* Direct RSVP Button */}
+        <MagneticWrapper>
+          <button
+            type="button"
+            onClick={() => navigate('/rsvp')}
+            className="group inline-flex items-center gap-2.5 px-6 py-2.5 rounded-full bg-[#E8D3B9]/15 hover:bg-[#E8D3B9] border border-[#E8D3B9]/45 hover:border-[#E8D3B9] backdrop-blur-md transition-all duration-500 cursor-pointer shadow-[0_6px_25px_rgba(0,0,0,0.4)]"
+            aria-label="RSVP For Wedding"
+          >
+            <span className="font-sans text-[10px] uppercase tracking-[0.3em] font-medium text-[#E8D3B9] group-hover:text-ink transition-colors duration-300">
+              RSVP For Wedding
+            </span>
+            <Heart className="w-3 h-3 text-[#E8D3B9] group-hover:text-ink group-hover:scale-110 transition-all duration-300 fill-current" />
           </button>
         </MagneticWrapper>
       </motion.div>

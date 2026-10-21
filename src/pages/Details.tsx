@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useSearchParams, useLocation } from 'react-router-dom';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import {
@@ -27,6 +28,8 @@ const pageVariants = {
 };
 
 export const Details: React.FC = () => {
+  const [searchParams] = useSearchParams();
+  const location = useLocation();
   const [isRsvpModalOpen, setIsRsvpModalOpen] = useState(false);
   const [rsvpData, setRsvpData] = useState({
     name: '',
@@ -40,6 +43,13 @@ export const Details: React.FC = () => {
   const [mapColorMode, setMapColorMode] = useState<'editorial' | 'standard'>(
     'editorial'
   );
+
+  // Auto-open RSVP modal if query param ?rsvp=true or hash #rsvp is provided
+  useEffect(() => {
+    if (searchParams.get('rsvp') === 'true' || location.hash === '#rsvp') {
+      setIsRsvpModalOpen(true);
+    }
+  }, [searchParams, location.hash]);
 
   // Lock background page scroll and support Escape key when RSVP modal is open
   useEffect(() => {
@@ -523,7 +533,7 @@ export const Details: React.FC = () => {
         </motion.div>
 
         {/* Bottom RSVP Section - Anchors gracefully at the bottom with ~2cm margin */}
-        <div className="min-h-[75vh] md:min-h-[85vh] flex flex-col justify-end items-center w-full pt-16 md:pt-24">
+        <div id="rsvp" className="min-h-[75vh] md:min-h-[85vh] flex flex-col justify-end items-center w-full pt-16 md:pt-24">
           <motion.div
             initial={{ opacity: 0, y: 35 }}
             whileInView={{ opacity: 1, y: 0 }}
