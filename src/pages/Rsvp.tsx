@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Heart, ArrowRight, CheckCircle2, Sparkles } from 'lucide-react';
+import { Heart, ArrowRight, CheckCircle2, Loader2 } from 'lucide-react';
 import { MagneticWrapper } from '../components/MagneticWrapper';
 import { weddingEventConfig } from '../data/weddingData';
 
@@ -139,7 +139,7 @@ export const Rsvp: React.FC = () => {
               
               {/* Auto-redirect notification pill */}
               <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-paper/5 border border-[#E8D3B9]/30 text-[#E8D3B9] text-[10.5px] font-sans tracking-widest uppercase mb-8">
-                <Sparkles className="w-3.5 h-3.5 animate-spin" />
+                <Loader2 className="w-3.5 h-3.5 animate-spin text-[#E8D3B9]" />
                 <span>Redirecting to celebration in {redirectCountdown}s...</span>
               </div>
 
