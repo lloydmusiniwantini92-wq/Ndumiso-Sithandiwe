@@ -172,29 +172,33 @@ export const DressCodeSection: React.FC = () => {
           </div>
         </div>
 
-        {/* Filter Tabs */}
-        <div className="flex justify-center mb-12 relative z-10">
-          <div className="inline-flex flex-wrap justify-center items-center gap-2 bg-paper/5 border border-paper/15 p-1.5 rounded-full backdrop-blur-md">
+        {/* Filter Tabs - Responsive Segmented Control */}
+        <div className="flex justify-center mb-10 sm:mb-12 relative z-10 px-2 sm:px-0">
+          <div className="w-full max-w-sm sm:max-w-xl grid grid-cols-3 p-1 sm:p-1.5 bg-[#141414]/90 sm:bg-paper/5 border border-[#E8D3B9]/25 sm:border-paper/15 rounded-full backdrop-blur-md shadow-lg">
             {(
               [
-                { id: 'all', label: 'Complete Vision Board' },
-                { id: 'ladies', label: "Ladies' Guide" },
-                { id: 'gentlemen', label: "Gentlemen's Guide" },
+                { id: 'all', shortLabel: 'All Looks', fullLabel: 'Complete Vision Board' },
+                { id: 'ladies', shortLabel: 'Ladies', fullLabel: "Ladies' Guide" },
+                { id: 'gentlemen', shortLabel: 'Gentlemen', fullLabel: "Gentlemen's Guide" },
               ] as const
-            ).map((tab) => (
-              <button
-                key={tab.id}
-                type="button"
-                onClick={() => setActiveTab(tab.id)}
-                className={`px-5 py-2.5 font-sans text-[10px] uppercase tracking-[0.25em] rounded-full transition-all duration-300 cursor-pointer ${
-                  activeTab === tab.id
-                    ? 'bg-[#E8D3B9] text-ink font-bold shadow-[0_0_20px_rgba(232,211,185,0.35)]'
-                    : 'text-paper/75 hover:text-paper'
-                }`}
-              >
-                {tab.label}
-              </button>
-            ))}
+            ).map((tab) => {
+              const isActive = activeTab === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`py-2 sm:py-2.5 px-1 sm:px-5 font-sans text-[9px] sm:text-[10px] uppercase tracking-[0.12em] sm:tracking-[0.25em] rounded-full transition-all duration-300 cursor-pointer text-center flex items-center justify-center font-medium ${
+                    isActive
+                      ? 'bg-[#E8D3B9] text-ink font-bold shadow-[0_2px_15px_rgba(232,211,185,0.35)]'
+                      : 'text-paper/70 hover:text-paper hover:bg-paper/5'
+                  }`}
+                >
+                  <span className="sm:hidden whitespace-nowrap">{tab.shortLabel}</span>
+                  <span className="hidden sm:inline whitespace-nowrap">{tab.fullLabel}</span>
+                </button>
+              );
+            })}
           </div>
         </div>
 
