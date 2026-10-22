@@ -103,6 +103,8 @@ export const GUEST_LIST: GuestEntry[] = [
   { id: 95, name: "Nomazulu", phone: "" },
 ];
 
+const STOP_WORDS = new Set(['mr', 'mrs', 'mr and mrs', 'and', 'the', 'miss', 'guest', 'couple']);
+
 /**
  * Normalizes a guest name for robust, flexible matching.
  */
@@ -113,28 +115,6 @@ export function normalizeGuestName(name: string): string {
     .replace(/[().,\-_'/]/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
-}
-
-/**
- * Extracts searchable keywords and tokens for a guest name.
- * Handles cultural prefixes like 'na'/'no' and honorifics like 'Mr and Mrs'.
- */
-function getKeywords(name: string): string[] {
-  const c = normalizeGuestName(name);
-  const withoutTitles = c.replace(/^(mr and mrs|mr & mrs|mr|mrs)\s+/, '');
-  const tokens = c.split(' ').filter((t) => t.length > 1);
-  const withoutTokens = withoutTitles.split(' ').filter((t) => t.length > 1);
-
-  // Cultural root extraction (e.g. naAgrippah -> Agrippah, Narhoda -> Rhoda)
-  const culturalRoots: string[] = [];
-  for (const t of [...tokens, ...withoutTokens]) {
-    if (t.startsWith('na') && t.length > 4) culturalRoots.push(t.slice(2));
-    if (t.startsWith('no') && t.length > 4) culturalRoots.push(t.slice(2));
-  }
-
-  return Array.from(
-    new Set([c, withoutTitles, ...tokens, ...withoutTokens, ...culturalRoots])
-  );
 }
 
 /**
@@ -165,83 +145,94 @@ function levenshtein(a: string, b: string): number {
 }
 
 /**
- * Intelligent fuzzy search for wedding guests.
- * Matches first names, last names, cultural roots, titles, and common typos.
- * Returns up to 3 high-confidence candidate guests.
+ * Intelligent search suggestions while typing.
  */
 export function smartMatchGuests(query: string, limit = 3): GuestEntry[] {
   const q = normalizeGuestName(query);
-  if (!q || q.length < 2) return [];
+  if (!q || q.length < 2 || STOP_WORDS.has(q)) return [];
 
-  const qTokens = q.split(' ').filter((t) => t.length > 1);
   const candidates: { guest: GuestEntry; score: number }[] = [];
 
   for (const guest of GUEST_LIST) {
-    const keywords = getKeywords(guest.name);
-    let bestScore = 0;
+    const raw = normalizeGuestName(guest.name);
+    const noParens = normalizeGuestName(guest.name.replace(/\(.*?\)/g, ''));
+    const withoutTitles = noParens.replace(/^(mr and mrs|mr & mrs|mr|mrs)\s+/, '');
+    const tokens = noParens.split(' ').filter(t => !STOP_WORDS.has(t) && t.length > 1);
 
-    for (const kw of keywords) {
-      if (kw === q) {
-        bestScore = Math.max(bestScore, 100);
-      } else if (kw.startsWith(q)) {
-        bestScore = Math.max(bestScore, 90);
-      } else if (q.startsWith(kw)) {
-        bestScore = Math.max(bestScore, 85);
-      } else if (kw.includes(q)) {
-        bestScore = Math.max(bestScore, 80);
-      } else {
-        const dist = levenshtein(q, kw);
-        const maxLen = Math.max(q.length, kw.length);
+    let score = 0;
+
+    if (raw === q || noParens === q || withoutTitles === q) {
+      score = 100;
+    } else if (raw.startsWith(q) || withoutTitles.startsWith(q)) {
+      score = 90;
+    } else if (tokens.some(t => t === q)) {
+      score = 85;
+    } else if (tokens.some(t => t.startsWith(q))) {
+      score = 80;
+    } else {
+      // Check cultural prefix 'na'
+      for (const t of tokens) {
+        if (t.startsWith('na') && t.length > 4) {
+          const root = t.slice(2);
+          if (root === q) score = Math.max(score, 90);
+          else if (root.startsWith(q)) score = Math.max(score, 80);
+        }
+      }
+      // Levenshtein typo tolerance on words
+      for (const t of [withoutTitles, ...tokens]) {
+        const dist = levenshtein(q, t);
+        const maxLen = Math.max(q.length, t.length);
         const sim = 1 - dist / maxLen;
-        // Typo tolerance: <= 2 letter edits or >= 60% similarity
-        if (dist <= 2 || sim >= 0.6) {
-          bestScore = Math.max(bestScore, Math.round(sim * 75));
+        if (dist <= 1 || (dist <= 2 && maxLen >= 6)) {
+          score = Math.max(score, Math.round(sim * 75));
         }
       }
     }
 
-    // Also match individual words in multi-word queries
-    for (const qt of qTokens) {
-      for (const kw of keywords) {
-        if (kw === qt) bestScore = Math.max(bestScore, 85);
-        else if (kw.startsWith(qt)) bestScore = Math.max(bestScore, 75);
-      }
-    }
-
-    if (bestScore >= 50) {
-      candidates.push({ guest, score: bestScore });
+    if (score >= 50) {
+      candidates.push({ guest, score });
     }
   }
 
-  // Sort descending by relevance score
   candidates.sort((a, b) => b.score - a.score);
-
   return candidates.slice(0, limit).map((c) => c.guest);
 }
 
 /**
- * Checks whether an input name is considered a verified match on the guest list.
+ * STRICT Verification: Verifies whether an input name belongs to the 95 invited guests.
+ * Rejects bogus text, numbers, generic titles, and uninvited names.
  */
 export function verifyGuestName(input: string): {
   isVerified: boolean;
   matchedGuest?: GuestEntry;
 } {
-  const clean = normalizeGuestName(input);
-  if (!clean || clean.length < 2) return { isVerified: false };
+  const q = normalizeGuestName(input);
+  if (!q || q.length < 3) return { isVerified: false };
+  if (STOP_WORDS.has(q)) return { isVerified: false };
 
-  // 1. Direct or stripped match
-  const exact = GUEST_LIST.find((g) => {
-    const norm = normalizeGuestName(g.name);
-    const withoutParens = normalizeGuestName(g.name.replace(/\(.*?\)/g, ''));
-    return norm === clean || withoutParens === clean;
-  });
-  if (exact) return { isVerified: true, matchedGuest: exact };
+  for (const guest of GUEST_LIST) {
+    const raw = normalizeGuestName(guest.name);
+    const noParens = normalizeGuestName(guest.name.replace(/\(.*?\)/g, ''));
+    const withoutTitles = noParens.replace(/^(mr and mrs|mr & mrs|mr|mrs)\s+/, '');
 
-  // 2. Keyword exact match (e.g. typing "Peter Mpofu" or "Mr and Mrs Sibanda")
-  for (const g of GUEST_LIST) {
-    const keywords = getKeywords(g.name);
-    if (keywords.includes(clean)) {
-      return { isVerified: true, matchedGuest: g };
+    // 1. Full name match
+    if (q === raw || q === noParens || q === withoutTitles) {
+      return { isVerified: true, matchedGuest: guest };
+    }
+
+    // 2. Individual name tokens (First name or Last name, at least 3 chars)
+    const tokens = noParens.split(' ').filter(t => !STOP_WORDS.has(t) && t.length >= 3);
+    for (const t of tokens) {
+      if (t === q) {
+        return { isVerified: true, matchedGuest: guest };
+      }
+      // Cultural root: naAgrippah -> Agrippah, Narhoda -> Rhoda
+      if (t.startsWith('na') && t.length > 4 && t.slice(2) === q) {
+        return { isVerified: true, matchedGuest: guest };
+      }
+      if (t.startsWith('no') && t.length > 4 && t.slice(2) === q) {
+        return { isVerified: true, matchedGuest: guest };
+      }
     }
   }
 

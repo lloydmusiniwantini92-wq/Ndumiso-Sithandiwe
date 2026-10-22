@@ -8,7 +8,6 @@ import {
   Loader2,
   UserCheck,
   AlertCircle,
-  Sparkles,
 } from 'lucide-react';
 import { MagneticWrapper } from '../components/MagneticWrapper';
 import { weddingEventConfig } from '../data/weddingData';
@@ -39,9 +38,7 @@ export const Rsvp: React.FC = () => {
     notes: '',
   });
   const [smartSuggestions, setSmartSuggestions] = useState<GuestEntry[]>([]);
-  const [isPlusOne, setIsPlusOne] = useState(false);
-  const [attendingWith, setAttendingWith] = useState('');
-  const [unrecognizedPrompt, setUnrecognizedPrompt] = useState(false);
+  const [refusalError, setRefusalError] = useState<string | null>(null);
   const [rsvpSubmitted, setRsvpSubmitted] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [redirectCountdown, setRedirectCountdown] = useState(4);
@@ -70,7 +67,7 @@ export const Rsvp: React.FC = () => {
   }, [rsvpSubmitted, navigate]);
 
   const handleNameChange = (val: string) => {
-    setUnrecognizedPrompt(false);
+    setRefusalError(null);
     setRsvpData((prev) => ({ ...prev, name: val }));
 
     if (val.trim().length >= 2) {
@@ -89,16 +86,14 @@ export const Rsvp: React.FC = () => {
       guests: guest.allowedGuests ? String(guest.allowedGuests) : prev.guests,
     }));
     setSmartSuggestions([]);
-    setUnrecognizedPrompt(false);
+    setRefusalError(null);
   };
 
-  const executeSubmission = async (extraNote = '') => {
+  const executeSubmission = async () => {
     setIsSubmitting(true);
     const endpoint =
       (import.meta as any).env?.VITE_RSVP_ENDPOINT ||
       'https://script.google.com/macros/s/AKfycbyTGxdmSFL2N5hEisMyTjgGQ_aOcr06TKavP-PwevV8zwnHN6A-j8nVyk-3Vn3_rugSSA/exec';
-
-    const fullNotes = [rsvpData.notes, extraNote].filter(Boolean).join(' | ');
 
     if (endpoint) {
       try {
@@ -110,7 +105,7 @@ export const Rsvp: React.FC = () => {
             phone: rsvpData.phone,
             attendance: rsvpData.attendance,
             guests: rsvpData.guests,
-            notes: fullNotes,
+            notes: rsvpData.notes,
             submittedAt: new Date().toISOString(),
           }),
         });
@@ -124,21 +119,27 @@ export const Rsvp: React.FC = () => {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    setRefusalError(null);
 
-    // If verified directly on the list, proceed immediately
-    if (verification.isVerified) {
-      executeSubmission();
-      return;
+    // 1. Strict Whitelist Verification (Client-side refusal):
+    if (!verification.isVerified) {
+      setRefusalError(
+        `"${rsvpData.name}" was not found on the invited wedding guest list. RSVPs are strictly reserved for invited guests. Please check your spelling or contact the couple directly.`
+      );
+      return; // STRAIGHT UP REFUSAL: NEVER SUBMITS
     }
 
-    // If attending as plus-one/spouse of an invited guest, proceed
-    if (isPlusOne && attendingWith.trim()) {
-      executeSubmission(`Attending with: ${attendingWith.trim()}`);
-      return;
+    // 2. Strict Phone Validation (reject letters or garbage strings):
+    const cleanPhone = rsvpData.phone.replace(/[\s\-\+\(\)]/g, '');
+    if (!/^\d{7,15}$/.test(cleanPhone)) {
+      setRefusalError(
+        'Please enter a valid phone or WhatsApp number (digits only, at least 7 digits).'
+      );
+      return; // STRAIGHT UP REFUSAL: NEVER SUBMITS
     }
 
-    // Name wasn't recognized on the list: prompt politely
-    setUnrecognizedPrompt(true);
+    // 3. Authorized submission:
+    executeSubmission();
   };
 
   return (
@@ -244,13 +245,15 @@ export const Rsvp: React.FC = () => {
                   value={rsvpData.name}
                   onChange={(e) => handleNameChange(e.target.value)}
                   className={`w-full bg-paper/5 border rounded-xl px-4 py-3 text-sm text-paper placeholder:text-paper/25 focus:outline-none transition-colors ${
-                    verification.isVerified
+                    refusalError
+                      ? 'border-rose-500/80 bg-rose-950/20 focus:border-rose-500'
+                      : verification.isVerified
                       ? 'border-[#E8D3B9]/80 focus:border-[#E8D3B9]'
                       : 'border-paper/15 focus:border-[#E8D3B9]'
                   }`}
                 />
 
-                {/* Intelligent Suggestion Pills (Only shown when relevant matches exist) */}
+                {/* Intelligent Suggestion Pills */}
                 {!verification.isVerified && smartSuggestions.length > 0 && (
                   <div className="flex flex-wrap items-center gap-1.5 mt-2.5">
                     <span className="text-[10px] uppercase tracking-widest text-[#E8D3B9]/60 font-medium">
@@ -288,9 +291,10 @@ export const Rsvp: React.FC = () => {
                   type="tel"
                   placeholder="e.g. 077 123 4567 or +263 77 123 4567"
                   value={rsvpData.phone}
-                  onChange={(e) =>
-                    setRsvpData({ ...rsvpData, phone: e.target.value })
-                  }
+                  onChange={(e) => {
+                    setRefusalError(null);
+                    setRsvpData({ ...rsvpData, phone: e.target.value });
+                  }}
                   className="w-full bg-paper/5 border border-paper/15 rounded-xl px-4 py-3 text-sm text-paper placeholder:text-paper/25 focus:outline-none focus:border-[#E8D3B9] transition-colors"
                 />
               </div>
@@ -346,60 +350,13 @@ export const Rsvp: React.FC = () => {
                 />
               </div>
 
-              {/* Unrecognized Name Helper (Only shown upon submit if name was not matched) */}
-              {unrecognizedPrompt && !verification.isVerified && (
-                <div className="p-4 rounded-2xl bg-[#1C1614] border border-[#E8D3B9]/40 text-paper text-xs space-y-3">
-                  <div className="flex items-start gap-2.5">
-                    <Sparkles className="w-4 h-4 text-[#E8D3B9] shrink-0 mt-0.5" />
-                    <div>
-                      <p className="font-semibold text-paper mb-1">
-                        We couldn't match "{rsvpData.name}" directly to our guest list.
-                      </p>
-                      <p className="text-paper/70 text-[11px] leading-relaxed">
-                        Are you attending as a spouse, partner, or plus-one of an invited guest?
-                      </p>
-                    </div>
-                  </div>
-
-                  <label className="flex items-start gap-2.5 p-2.5 rounded-xl bg-paper/5 border border-paper/10 cursor-pointer hover:border-[#E8D3B9]/40 transition-colors">
-                    <input
-                      type="checkbox"
-                      checked={isPlusOne}
-                      onChange={(e) => setIsPlusOne(e.target.checked)}
-                      className="mt-0.5 accent-[#E8D3B9]"
-                    />
-                    <span className="text-[11.5px] text-paper/90 leading-tight">
-                      Yes, I am attending with an invited guest
-                    </span>
-                  </label>
-
-                  {isPlusOne && (
-                    <input
-                      type="text"
-                      placeholder="Invited guest's name you are attending with..."
-                      value={attendingWith}
-                      onChange={(e) => setAttendingWith(e.target.value)}
-                      className="w-full bg-paper/5 border border-paper/20 rounded-xl px-3 py-2 text-xs text-paper placeholder:text-paper/30 focus:outline-none focus:border-[#E8D3B9]"
-                    />
-                  )}
-
-                  <div className="flex items-center justify-between pt-1">
-                    <button
-                      type="button"
-                      onClick={() => setUnrecognizedPrompt(false)}
-                      className="text-[10px] text-paper/60 hover:text-paper underline cursor-pointer"
-                    >
-                      &larr; Re-check spelling
-                    </button>
-                    {isPlusOne && attendingWith.trim() && (
-                      <button
-                        type="button"
-                        onClick={() => executeSubmission(`Attending with: ${attendingWith.trim()}`)}
-                        className="px-4 py-2 rounded-xl bg-[#E8D3B9] text-ink font-bold text-[10px] uppercase tracking-widest hover:bg-[#FAF8F5] transition-all cursor-pointer"
-                      >
-                        Confirm &amp; Send RSVP &rarr;
-                      </button>
-                    )}
+              {/* Strict Client-side Refusal Banner */}
+              {refusalError && (
+                <div className="p-4 rounded-2xl bg-rose-950/60 border border-rose-500/60 text-rose-200 text-xs flex items-start gap-3 leading-relaxed shadow-xl">
+                  <AlertCircle className="w-5 h-5 text-rose-400 shrink-0 mt-0.5" />
+                  <div>
+                    <p className="font-semibold text-rose-100 mb-0.5">RSVP Not Permitted</p>
+                    <p className="text-rose-200/90">{refusalError}</p>
                   </div>
                 </div>
               )}
@@ -413,7 +370,7 @@ export const Rsvp: React.FC = () => {
                 disabled={isSubmitting}
                 className="w-full mt-2 py-4 rounded-xl bg-[#E8D3B9] text-ink font-sans text-[11px] tracking-[0.4em] uppercase font-bold hover:bg-[#FAF8F5] transition-all shadow-[0_10px_30px_rgba(232,211,185,0.25)] disabled:opacity-60 cursor-pointer"
               >
-                {isSubmitting ? 'Recording to Guest List...' : 'Send RSVP Response'}
+                {isSubmitting ? 'Checking Guest List...' : 'Send RSVP Response'}
               </button>
             </form>
           )}
