@@ -1,9 +1,14 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { motion } from 'motion/react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Heart, ArrowRight, CheckCircle2, Loader2 } from 'lucide-react';
+import { Heart, ArrowRight, CheckCircle2, Loader2, UserCheck, AlertCircle } from 'lucide-react';
 import { MagneticWrapper } from '../components/MagneticWrapper';
 import { weddingEventConfig } from '../data/weddingData';
+import {
+  verifyGuestName,
+  searchGuestList,
+  GuestEntry,
+} from '../data/guestListData';
 
 const tSettings = { duration: 1.2, ease: [0.76, 0, 0.24, 1] as const };
 const pageVariants = {
@@ -20,14 +25,37 @@ export const Rsvp: React.FC = () => {
   const navigate = useNavigate();
   const [rsvpData, setRsvpData] = useState({
     name: '',
-    email: '',
+    phone: '',
     attendance: 'attending',
     guests: '1',
     notes: '',
   });
+  const [suggestions, setSuggestions] = useState<GuestEntry[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [validationError, setValidationError] = useState<string | null>(null);
   const [rsvpSubmitted, setRsvpSubmitted] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [redirectCountdown, setRedirectCountdown] = useState(4);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  const verification = useMemo(
+    () => verifyGuestName(rsvpData.name),
+    [rsvpData.name]
+  );
+
+  // Close suggestions dropdown on outside click
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (
+        dropdownRef.current &&
+        !dropdownRef.current.contains(e.target as Node)
+      ) {
+        setShowSuggestions(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   // When form is submitted via this custom route, automatically route to the Home page
   useEffect(() => {
@@ -47,8 +75,44 @@ export const Rsvp: React.FC = () => {
     return () => clearInterval(interval);
   }, [rsvpSubmitted, navigate]);
 
+  const handleNameChange = (val: string) => {
+    setValidationError(null);
+    setRsvpData((prev) => ({ ...prev, name: val }));
+
+    if (val.trim().length >= 2) {
+      const matches = searchGuestList(val, 6);
+      setSuggestions(matches);
+      setShowSuggestions(matches.length > 0);
+    } else {
+      setSuggestions([]);
+      setShowSuggestions(false);
+    }
+  };
+
+  const handleSelectGuest = (guest: GuestEntry) => {
+    setRsvpData((prev) => ({
+      ...prev,
+      name: guest.name,
+      phone: prev.phone || guest.phone || '',
+      guests: guest.allowedGuests ? String(guest.allowedGuests) : prev.guests,
+    }));
+    setSuggestions([]);
+    setShowSuggestions(false);
+    setValidationError(null);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setValidationError(null);
+
+    // Verify name is on the guest list
+    if (!verification.isVerified) {
+      setValidationError(
+        'This private celebration is strictly reserved for invited guests. We could not match this name to the guest list. Please select your name from the suggestions or contact Ndumiso & Sithandiwe directly.'
+      );
+      return;
+    }
+
     setIsSubmitting(true);
     const endpoint =
       (import.meta as any).env?.VITE_RSVP_ENDPOINT ||
@@ -60,7 +124,11 @@ export const Rsvp: React.FC = () => {
           method: 'POST',
           mode: 'no-cors',
           body: new URLSearchParams({
-            ...rsvpData,
+            name: rsvpData.name,
+            phone: rsvpData.phone,
+            attendance: rsvpData.attendance,
+            guests: rsvpData.guests,
+            notes: rsvpData.notes,
             submittedAt: new Date().toISOString(),
           }),
         });
@@ -155,38 +223,96 @@ export const Rsvp: React.FC = () => {
             </motion.div>
           ) : (
             <form onSubmit={handleSubmit} className="flex flex-col gap-5 text-left">
-              <div>
-                <label className="font-sans text-[10px] tracking-[0.3em] uppercase text-paper/70 block mb-2 font-medium">
-                  Your Full Name *
-                </label>
+              {/* Full Name Field with Whitelist Verification & Autocomplete */}
+              <div className="relative" ref={dropdownRef}>
+                <div className="flex items-center justify-between mb-2">
+                  <label className="font-sans text-[10px] tracking-[0.3em] uppercase text-paper/70 font-medium">
+                    Your Full Name *
+                  </label>
+                  {verification.isVerified && (
+                    <span className="inline-flex items-center gap-1 text-[10px] uppercase tracking-wider text-[#E8D3B9] font-medium">
+                      <UserCheck className="w-3 h-3 text-[#E8D3B9]" />
+                      <span>Verified Guest</span>
+                    </span>
+                  )}
+                </div>
+
                 <input
                   required
                   type="text"
-                  placeholder="e.g. Sipho & Guest"
+                  autoComplete="off"
+                  placeholder="Start typing your name as invited..."
                   value={rsvpData.name}
-                  onChange={(e) =>
-                    setRsvpData({ ...rsvpData, name: e.target.value })
-                  }
-                  className="w-full bg-paper/5 border border-paper/15 rounded-xl px-4 py-3 text-sm text-paper placeholder:text-paper/25 focus:outline-none focus:border-[#E8D3B9] transition-colors"
+                  onChange={(e) => handleNameChange(e.target.value)}
+                  onFocus={() => {
+                    if (rsvpData.name.trim().length >= 2 && suggestions.length > 0) {
+                      setShowSuggestions(true);
+                    }
+                  }}
+                  className={`w-full bg-paper/5 border rounded-xl px-4 py-3 text-sm text-paper placeholder:text-paper/25 focus:outline-none transition-colors ${
+                    verification.isVerified
+                      ? 'border-[#E8D3B9]/80 focus:border-[#E8D3B9]'
+                      : 'border-paper/15 focus:border-[#E8D3B9]'
+                  }`}
                 />
+
+                {/* Autocomplete Dropdown */}
+                {showSuggestions && suggestions.length > 0 && (
+                  <div className="absolute z-30 left-0 right-0 mt-1.5 bg-[#141414] border border-[#E8D3B9]/40 rounded-xl shadow-2xl overflow-hidden backdrop-blur-md">
+                    <div className="px-3 py-1.5 bg-paper/5 border-b border-paper/10 text-[9px] uppercase tracking-widest text-[#E8D3B9]/70">
+                      Select Your Name From Guest List
+                    </div>
+                    {suggestions.map((guest) => (
+                      <button
+                        key={guest.id}
+                        type="button"
+                        onClick={() => handleSelectGuest(guest)}
+                        className="w-full text-left px-4 py-2.5 hover:bg-[#E8D3B9]/15 transition-colors flex items-center justify-between text-xs text-paper border-b border-paper/5 last:border-b-0 cursor-pointer"
+                      >
+                        <span className="font-serif italic text-sm text-[#FAF8F5]">
+                          {guest.name}
+                        </span>
+                        {guest.allowedGuests && guest.allowedGuests > 1 && (
+                          <span className="text-[10px] text-[#E8D3B9]/80 uppercase tracking-wider">
+                            Party of {guest.allowedGuests}
+                          </span>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                {/* Status Guidance */}
+                {verification.isVerified ? (
+                  <p className="text-[11px] text-[#E8D3B9]/90 mt-1.5 flex items-center gap-1.5">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-[#E8D3B9] shrink-0" />
+                    <span>Invitation confirmed for <strong>{verification.matchedGuest?.name}</strong></span>
+                  </p>
+                ) : rsvpData.name.trim().length >= 3 ? (
+                  <p className="text-[11px] text-amber-200/75 mt-1.5 leading-snug">
+                    Please ensure your name matches your invitation or select it from the suggestions above.
+                  </p>
+                ) : null}
               </div>
 
+              {/* Phone / WhatsApp Field (Emails Removed) */}
               <div>
                 <label className="font-sans text-[10px] tracking-[0.3em] uppercase text-paper/70 block mb-2 font-medium">
-                  Email Address *
+                  Phone / WhatsApp Number *
                 </label>
                 <input
                   required
-                  type="email"
-                  placeholder="e.g. guest@example.com"
-                  value={rsvpData.email}
+                  type="tel"
+                  placeholder="e.g. 077 123 4567 or +263 77 123 4567"
+                  value={rsvpData.phone}
                   onChange={(e) =>
-                    setRsvpData({ ...rsvpData, email: e.target.value })
+                    setRsvpData({ ...rsvpData, phone: e.target.value })
                   }
                   className="w-full bg-paper/5 border border-paper/15 rounded-xl px-4 py-3 text-sm text-paper placeholder:text-paper/25 focus:outline-none focus:border-[#E8D3B9] transition-colors"
                 />
               </div>
 
+              {/* Attendance & Number of Guests */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="font-sans text-[10px] tracking-[0.3em] uppercase text-paper/70 block mb-2 font-medium">
@@ -221,6 +347,7 @@ export const Rsvp: React.FC = () => {
                 </div>
               </div>
 
+              {/* Notes */}
               <div>
                 <label className="font-sans text-[10px] tracking-[0.3em] uppercase text-paper/70 block mb-2 font-medium">
                   Special Dietary / Heartfelt Wishes
@@ -235,6 +362,14 @@ export const Rsvp: React.FC = () => {
                   className="w-full bg-paper/5 border border-paper/15 rounded-xl px-4 py-2.5 text-sm text-paper placeholder:text-paper/25 focus:outline-none focus:border-[#E8D3B9] transition-colors resize-none"
                 />
               </div>
+
+              {/* Validation Error Banner */}
+              {validationError && (
+                <div className="p-3.5 rounded-xl bg-rose-950/40 border border-rose-500/40 text-rose-200 text-xs flex items-start gap-2.5 leading-relaxed">
+                  <AlertCircle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
+                  <span>{validationError}</span>
+                </div>
+              )}
 
               <p className="font-sans text-[9.5px] uppercase tracking-[0.22em] text-[#E8D3B9]/80 text-center font-medium my-1">
                 * Kindly note: This is an adults-only celebration (18+).
