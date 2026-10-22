@@ -105,7 +105,6 @@ export const GUEST_LIST: GuestEntry[] = [
 
 /**
  * Normalizes a guest name for robust, flexible matching.
- * Handles casing, ampersands vs 'and', extra punctuation and whitespace.
  */
 export function normalizeGuestName(name: string): string {
   return name
@@ -117,52 +116,132 @@ export function normalizeGuestName(name: string): string {
 }
 
 /**
- * Searches the guest list for autocomplete suggestions based on what the user types.
+ * Extracts searchable keywords and tokens for a guest name.
+ * Handles cultural prefixes like 'na'/'no' and honorifics like 'Mr and Mrs'.
  */
-export function searchGuestList(query: string, limit = 5): GuestEntry[] {
-  const clean = normalizeGuestName(query);
-  if (!clean || clean.length < 2) return [];
+function getKeywords(name: string): string[] {
+  const c = normalizeGuestName(name);
+  const withoutTitles = c.replace(/^(mr and mrs|mr & mrs|mr|mrs)\s+/, '');
+  const tokens = c.split(' ').filter((t) => t.length > 1);
+  const withoutTokens = withoutTitles.split(' ').filter((t) => t.length > 1);
 
-  const words = clean.split(' ').filter(Boolean);
+  // Cultural root extraction (e.g. naAgrippah -> Agrippah, Narhoda -> Rhoda)
+  const culturalRoots: string[] = [];
+  for (const t of [...tokens, ...withoutTokens]) {
+    if (t.startsWith('na') && t.length > 4) culturalRoots.push(t.slice(2));
+    if (t.startsWith('no') && t.length > 4) culturalRoots.push(t.slice(2));
+  }
 
-  return GUEST_LIST.filter((guest) => {
-    const norm = normalizeGuestName(guest.name);
-    // Direct substring match
-    if (norm.includes(clean)) return true;
-    // Word-by-word match
-    return words.every((w) => norm.includes(w));
-  }).slice(0, limit);
+  return Array.from(
+    new Set([c, withoutTitles, ...tokens, ...withoutTokens, ...culturalRoots])
+  );
 }
 
 /**
- * Verifies if a given input name corresponds to an invited guest.
+ * Computes Levenshtein edit distance between two strings.
+ */
+function levenshtein(a: string, b: string): number {
+  const m = a.length;
+  const n = b.length;
+  const d: number[][] = Array.from({ length: m + 1 }, () =>
+    Array(n + 1).fill(0)
+  );
+
+  for (let i = 0; i <= m; i++) d[i][0] = i;
+  for (let j = 0; j <= n; j++) d[0][j] = j;
+
+  for (let i = 1; i <= m; i++) {
+    for (let j = 1; j <= n; j++) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      d[i][j] = Math.min(
+        d[i - 1][j] + 1,
+        d[i][j - 1] + 1,
+        d[i - 1][j - 1] + cost
+      );
+    }
+  }
+
+  return d[m][n];
+}
+
+/**
+ * Intelligent fuzzy search for wedding guests.
+ * Matches first names, last names, cultural roots, titles, and common typos.
+ * Returns up to 3 high-confidence candidate guests.
+ */
+export function smartMatchGuests(query: string, limit = 3): GuestEntry[] {
+  const q = normalizeGuestName(query);
+  if (!q || q.length < 2) return [];
+
+  const qTokens = q.split(' ').filter((t) => t.length > 1);
+  const candidates: { guest: GuestEntry; score: number }[] = [];
+
+  for (const guest of GUEST_LIST) {
+    const keywords = getKeywords(guest.name);
+    let bestScore = 0;
+
+    for (const kw of keywords) {
+      if (kw === q) {
+        bestScore = Math.max(bestScore, 100);
+      } else if (kw.startsWith(q)) {
+        bestScore = Math.max(bestScore, 90);
+      } else if (q.startsWith(kw)) {
+        bestScore = Math.max(bestScore, 85);
+      } else if (kw.includes(q)) {
+        bestScore = Math.max(bestScore, 80);
+      } else {
+        const dist = levenshtein(q, kw);
+        const maxLen = Math.max(q.length, kw.length);
+        const sim = 1 - dist / maxLen;
+        // Typo tolerance: <= 2 letter edits or >= 60% similarity
+        if (dist <= 2 || sim >= 0.6) {
+          bestScore = Math.max(bestScore, Math.round(sim * 75));
+        }
+      }
+    }
+
+    // Also match individual words in multi-word queries
+    for (const qt of qTokens) {
+      for (const kw of keywords) {
+        if (kw === qt) bestScore = Math.max(bestScore, 85);
+        else if (kw.startsWith(qt)) bestScore = Math.max(bestScore, 75);
+      }
+    }
+
+    if (bestScore >= 50) {
+      candidates.push({ guest, score: bestScore });
+    }
+  }
+
+  // Sort descending by relevance score
+  candidates.sort((a, b) => b.score - a.score);
+
+  return candidates.slice(0, limit).map((c) => c.guest);
+}
+
+/**
+ * Checks whether an input name is considered a verified match on the guest list.
  */
 export function verifyGuestName(input: string): {
   isVerified: boolean;
   matchedGuest?: GuestEntry;
 } {
   const clean = normalizeGuestName(input);
-  if (!clean) return { isVerified: false };
+  if (!clean || clean.length < 2) return { isVerified: false };
 
-  // 1. Exact normalized match
-  const exact = GUEST_LIST.find((g) => normalizeGuestName(g.name) === clean);
+  // 1. Direct or stripped match
+  const exact = GUEST_LIST.find((g) => {
+    const norm = normalizeGuestName(g.name);
+    const withoutParens = normalizeGuestName(g.name.replace(/\(.*?\)/g, ''));
+    return norm === clean || withoutParens === clean;
+  });
   if (exact) return { isVerified: true, matchedGuest: exact };
 
-  // 2. Exact match ignoring parenthetical notes like "(bridesparents)"
-  const withoutParens = GUEST_LIST.find((g) => {
-    const simplified = normalizeGuestName(g.name.replace(/\(.*?\)/g, ''));
-    return simplified === clean;
-  });
-  if (withoutParens) return { isVerified: true, matchedGuest: withoutParens };
-
-  // 3. Substring match if input is specific enough (e.g. 5+ chars and matches uniquely)
-  if (clean.length >= 5) {
-    const candidates = GUEST_LIST.filter((g) => {
-      const norm = normalizeGuestName(g.name);
-      return norm === clean || norm.includes(clean);
-    });
-    if (candidates.length === 1) {
-      return { isVerified: true, matchedGuest: candidates[0] };
+  // 2. Keyword exact match (e.g. typing "Peter Mpofu" or "Mr and Mrs Sibanda")
+  for (const g of GUEST_LIST) {
+    const keywords = getKeywords(g.name);
+    if (keywords.includes(clean)) {
+      return { isVerified: true, matchedGuest: g };
     }
   }
 

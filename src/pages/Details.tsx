@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useSearchParams, useLocation } from 'react-router-dom';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'motion/react';
@@ -11,13 +11,14 @@ import {
   CheckCircle2,
   UserCheck,
   AlertCircle,
+  Sparkles,
 } from 'lucide-react';
 import { MagneticWrapper } from '../components/MagneticWrapper';
 import { DressCodeSection } from '../components/DressCodeSection';
 import { weddingEventConfig } from '../data/weddingData';
 import {
   verifyGuestName,
-  searchGuestList,
+  smartMatchGuests,
   GuestEntry,
 } from '../data/guestListData';
 
@@ -46,15 +47,15 @@ export const Details: React.FC = () => {
     guests: '1',
     notes: '',
   });
-  const [suggestions, setSuggestions] = useState<GuestEntry[]>([]);
-  const [showSuggestions, setShowSuggestions] = useState(false);
-  const [validationError, setValidationError] = useState<string | null>(null);
+  const [smartSuggestions, setSmartSuggestions] = useState<GuestEntry[]>([]);
+  const [isPlusOne, setIsPlusOne] = useState(false);
+  const [attendingWith, setAttendingWith] = useState('');
+  const [unrecognizedPrompt, setUnrecognizedPrompt] = useState(false);
   const [rsvpSubmitted, setRsvpSubmitted] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [mapColorMode, setMapColorMode] = useState<'editorial' | 'standard'>(
     'editorial'
   );
-  const modalDropdownRef = useRef<HTMLDivElement>(null);
 
   const verification = useMemo(
     () => verifyGuestName(rsvpData.name),
@@ -85,31 +86,15 @@ export const Details: React.FC = () => {
     };
   }, [isRsvpModalOpen]);
 
-  // Close suggestions dropdown on outside click
-  useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      if (
-        modalDropdownRef.current &&
-        !modalDropdownRef.current.contains(e.target as Node)
-      ) {
-        setShowSuggestions(false);
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
-
   const handleNameChange = (val: string) => {
-    setValidationError(null);
+    setUnrecognizedPrompt(false);
     setRsvpData((prev) => ({ ...prev, name: val }));
 
     if (val.trim().length >= 2) {
-      const matches = searchGuestList(val, 6);
-      setSuggestions(matches);
-      setShowSuggestions(matches.length > 0);
+      const matches = smartMatchGuests(val, 3);
+      setSmartSuggestions(matches);
     } else {
-      setSuggestions([]);
-      setShowSuggestions(false);
+      setSmartSuggestions([]);
     }
   };
 
@@ -120,9 +105,38 @@ export const Details: React.FC = () => {
       phone: prev.phone || guest.phone || '',
       guests: guest.allowedGuests ? String(guest.allowedGuests) : prev.guests,
     }));
-    setSuggestions([]);
-    setShowSuggestions(false);
-    setValidationError(null);
+    setSmartSuggestions([]);
+    setUnrecognizedPrompt(false);
+  };
+
+  const executeSubmission = async (extraNote = '') => {
+    setIsSubmitting(true);
+    const endpoint =
+      (import.meta as any).env?.VITE_RSVP_ENDPOINT ||
+      'https://script.google.com/macros/s/AKfycbyTGxdmSFL2N5hEisMyTjgGQ_aOcr06TKavP-PwevV8zwnHN6A-j8nVyk-3Vn3_rugSSA/exec';
+
+    const fullNotes = [rsvpData.notes, extraNote].filter(Boolean).join(' | ');
+
+    if (endpoint) {
+      try {
+        await fetch(endpoint, {
+          method: 'POST',
+          mode: 'no-cors',
+          body: new URLSearchParams({
+            name: rsvpData.name,
+            phone: rsvpData.phone,
+            attendance: rsvpData.attendance,
+            guests: rsvpData.guests,
+            notes: fullNotes,
+            submittedAt: new Date().toISOString(),
+          }),
+        });
+      } catch (err) {
+        console.error('RSVP submission failed', err);
+      }
+    }
+    setIsSubmitting(false);
+    setRsvpSubmitted(true);
   };
 
   return (
@@ -714,46 +728,22 @@ export const Details: React.FC = () => {
                     </div>
                   ) : (
                     <form
-                      onSubmit={async (e) => {
+                      onSubmit={(e) => {
                         e.preventDefault();
-                        setValidationError(null);
-
-                        if (!verification.isVerified) {
-                          setValidationError(
-                            'This private celebration is strictly reserved for invited guests. We could not match this name to the guest list. Please select your name from the suggestions or contact Ndumiso & Sithandiwe directly.'
-                          );
+                        if (verification.isVerified) {
+                          executeSubmission();
                           return;
                         }
-
-                        setIsSubmitting(true);
-                        const endpoint =
-                          (import.meta as any).env?.VITE_RSVP_ENDPOINT ||
-                          'https://script.google.com/macros/s/AKfycbyTGxdmSFL2N5hEisMyTjgGQ_aOcr06TKavP-PwevV8zwnHN6A-j8nVyk-3Vn3_rugSSA/exec';
-                        if (endpoint) {
-                          try {
-                            await fetch(endpoint, {
-                              method: 'POST',
-                              mode: 'no-cors',
-                              body: new URLSearchParams({
-                                name: rsvpData.name,
-                                phone: rsvpData.phone,
-                                attendance: rsvpData.attendance,
-                                guests: rsvpData.guests,
-                                notes: rsvpData.notes,
-                                submittedAt: new Date().toISOString(),
-                              }),
-                            });
-                          } catch (err) {
-                            console.error('RSVP submission failed', err);
-                          }
+                        if (isPlusOne && attendingWith.trim()) {
+                          executeSubmission(`Attending with: ${attendingWith.trim()}`);
+                          return;
                         }
-                        setIsSubmitting(false);
-                        setRsvpSubmitted(true);
+                        setUnrecognizedPrompt(true);
                       }}
                       className="flex flex-col gap-5 text-left"
                     >
-                      {/* Name input with guest verification & autocomplete */}
-                      <div className="relative" ref={modalDropdownRef}>
+                      {/* Name input with intelligent search */}
+                      <div>
                         <div className="flex items-center justify-between mb-2">
                           <label className="font-sans text-[10px] tracking-[0.3em] uppercase text-paper/70 font-medium">
                             Your Full Name *
@@ -769,14 +759,9 @@ export const Details: React.FC = () => {
                           required
                           type="text"
                           autoComplete="off"
-                          placeholder="Start typing your name as invited..."
+                          placeholder="e.g. Peter Mpofu or Sithandiwe"
                           value={rsvpData.name}
                           onChange={(e) => handleNameChange(e.target.value)}
-                          onFocus={() => {
-                            if (rsvpData.name.trim().length >= 2 && suggestions.length > 0) {
-                              setShowSuggestions(true);
-                            }
-                          }}
                           className={`w-full bg-paper/5 border rounded-xl px-4 py-3 text-sm text-paper placeholder:text-paper/25 focus:outline-none transition-colors ${
                             verification.isVerified
                               ? 'border-[#E8D3B9]/80 focus:border-[#E8D3B9]'
@@ -784,46 +769,35 @@ export const Details: React.FC = () => {
                           }`}
                         />
 
-                        {/* Autocomplete Dropdown */}
-                        {showSuggestions && suggestions.length > 0 && (
-                          <div className="absolute z-30 left-0 right-0 mt-1.5 bg-[#141414] border border-[#E8D3B9]/40 rounded-xl shadow-2xl overflow-hidden backdrop-blur-md">
-                            <div className="px-3 py-1.5 bg-paper/5 border-b border-paper/10 text-[9px] uppercase tracking-widest text-[#E8D3B9]/70">
-                              Select Your Name From Guest List
-                            </div>
-                            {suggestions.map((guest) => (
+                        {/* Intelligent Suggestion Pills */}
+                        {!verification.isVerified && smartSuggestions.length > 0 && (
+                          <div className="flex flex-wrap items-center gap-1.5 mt-2.5">
+                            <span className="text-[10px] uppercase tracking-widest text-[#E8D3B9]/60 font-medium">
+                              Select name:
+                            </span>
+                            {smartSuggestions.map((g) => (
                               <button
-                                key={guest.id}
+                                key={g.id}
                                 type="button"
-                                onClick={() => handleSelectGuest(guest)}
-                                className="w-full text-left px-4 py-2.5 hover:bg-[#E8D3B9]/15 transition-colors flex items-center justify-between text-xs text-paper border-b border-paper/5 last:border-b-0 cursor-pointer"
+                                onClick={() => handleSelectGuest(g)}
+                                className="px-2.5 py-1 rounded-full bg-[#E8D3B9]/15 border border-[#E8D3B9]/35 text-[#E8D3B9] text-xs hover:bg-[#E8D3B9]/25 hover:border-[#E8D3B9] transition-all cursor-pointer font-serif italic"
                               >
-                                <span className="font-serif italic text-sm text-[#FAF8F5]">
-                                  {guest.name}
-                                </span>
-                                {guest.allowedGuests && guest.allowedGuests > 1 && (
-                                  <span className="text-[10px] text-[#E8D3B9]/80 uppercase tracking-wider">
-                                    Party of {guest.allowedGuests}
-                                  </span>
-                                )}
+                                {g.name}
                               </button>
                             ))}
                           </div>
                         )}
 
-                        {/* Status Guidance */}
-                        {verification.isVerified ? (
-                          <p className="text-[11px] text-[#E8D3B9]/90 mt-1.5 flex items-center gap-1.5">
+                        {/* Verified Confirmation */}
+                        {verification.isVerified && (
+                          <p className="text-[11px] text-[#E8D3B9]/90 mt-2 flex items-center gap-1.5">
                             <CheckCircle2 className="w-3.5 h-3.5 text-[#E8D3B9] shrink-0" />
                             <span>Invitation confirmed for <strong>{verification.matchedGuest?.name}</strong></span>
                           </p>
-                        ) : rsvpData.name.trim().length >= 3 ? (
-                          <p className="text-[11px] text-amber-200/75 mt-1.5 leading-snug">
-                            Please ensure your name matches your invitation or select it from the suggestions above.
-                          </p>
-                        ) : null}
+                        )}
                       </div>
 
-                      {/* Phone / WhatsApp Field (Emails Removed) */}
+                      {/* Phone / WhatsApp Field */}
                       <div>
                         <label className="font-sans text-[10px] tracking-[0.3em] uppercase text-paper/70 block mb-2 font-medium">
                           Phone / WhatsApp Number *
@@ -897,11 +871,61 @@ export const Details: React.FC = () => {
                         />
                       </div>
 
-                      {/* Validation Error Banner */}
-                      {validationError && (
-                        <div className="p-3.5 rounded-xl bg-rose-950/40 border border-rose-500/40 text-rose-200 text-xs flex items-start gap-2.5 leading-relaxed">
-                          <AlertCircle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
-                          <span>{validationError}</span>
+                      {/* Unrecognized Name Helper */}
+                      {unrecognizedPrompt && !verification.isVerified && (
+                        <div className="p-4 rounded-2xl bg-[#1C1614] border border-[#E8D3B9]/40 text-paper text-xs space-y-3">
+                          <div className="flex items-start gap-2.5">
+                            <Sparkles className="w-4 h-4 text-[#E8D3B9] shrink-0 mt-0.5" />
+                            <div>
+                              <p className="font-semibold text-paper mb-1">
+                                We couldn't match "{rsvpData.name}" directly to our guest list.
+                              </p>
+                              <p className="text-paper/70 text-[11px] leading-relaxed">
+                                Are you attending as a spouse, partner, or plus-one of an invited guest?
+                              </p>
+                            </div>
+                          </div>
+
+                          <label className="flex items-start gap-2.5 p-2.5 rounded-xl bg-paper/5 border border-paper/10 cursor-pointer hover:border-[#E8D3B9]/40 transition-colors">
+                            <input
+                              type="checkbox"
+                              checked={isPlusOne}
+                              onChange={(e) => setIsPlusOne(e.target.checked)}
+                              className="mt-0.5 accent-[#E8D3B9]"
+                            />
+                            <span className="text-[11.5px] text-paper/90 leading-tight">
+                              Yes, I am attending with an invited guest
+                            </span>
+                          </label>
+
+                          {isPlusOne && (
+                            <input
+                              type="text"
+                              placeholder="Invited guest's name you are attending with..."
+                              value={attendingWith}
+                              onChange={(e) => setAttendingWith(e.target.value)}
+                              className="w-full bg-paper/5 border border-paper/20 rounded-xl px-3 py-2 text-xs text-paper placeholder:text-paper/30 focus:outline-none focus:border-[#E8D3B9]"
+                            />
+                          )}
+
+                          <div className="flex items-center justify-between pt-1">
+                            <button
+                              type="button"
+                              onClick={() => setUnrecognizedPrompt(false)}
+                              className="text-[10px] text-paper/60 hover:text-paper underline cursor-pointer"
+                            >
+                              &larr; Re-check spelling
+                            </button>
+                            {isPlusOne && attendingWith.trim() && (
+                              <button
+                                type="button"
+                                onClick={() => executeSubmission(`Attending with: ${attendingWith.trim()}`)}
+                                className="px-4 py-2 rounded-xl bg-[#E8D3B9] text-ink font-bold text-[10px] uppercase tracking-widest hover:bg-[#FAF8F5] transition-all cursor-pointer"
+                              >
+                                Confirm &amp; Send RSVP &rarr;
+                              </button>
+                            )}
+                          </div>
                         </div>
                       )}
 
