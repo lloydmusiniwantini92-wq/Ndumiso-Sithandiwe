@@ -4,6 +4,7 @@ import { motion, useMotionValue, useSpring } from 'motion/react';
 interface MagneticWrapperProps {
   children: React.ReactNode;
   className?: string;
+  key?: React.Key;
 }
 
 export function MagneticWrapper({ children, className = '' }: MagneticWrapperProps) {

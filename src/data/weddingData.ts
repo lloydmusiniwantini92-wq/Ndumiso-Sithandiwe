@@ -36,7 +36,7 @@ export const weddingEventConfig = {
 export const journeyData: JourneyItem[] = [
   {
     id: 1,
-    date: 'January 2023',
+    date: '2021',
     image: '/photos/couple-standing-smile.jpg',
     text: 'A spark over shared plates and endless conversation. Our story began under a crescent moon.',
     likes: 45,
@@ -58,7 +58,7 @@ export const journeyData: JourneyItem[] = [
   },
   {
     id: 4,
-    date: 'October 2025',
+    date: 'November 2025',
     subtitle: 'The Engagement',
     image: '/photos/couple-gazing-smile.jpg',
     text: 'Surrounded by our closest friends and family, we toasted to the future and danced until dawn.',
