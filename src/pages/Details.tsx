@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { useSearchParams, useLocation } from 'react-router-dom';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { useSearchParams, useLocation, Link } from 'react-router-dom';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import {
@@ -19,6 +19,9 @@ import { weddingEventConfig } from '../data/weddingData';
 import {
   verifyGuestName,
   smartMatchGuests,
+  getActiveGuestList,
+  syncWithGoogleSheets,
+  submitGuestRsvp,
   GuestEntry,
 } from '../data/guestListData';
 
@@ -39,6 +42,9 @@ const pageVariants = {
 export const Details: React.FC = () => {
   const [searchParams] = useSearchParams();
   const location = useLocation();
+  const [guestList, setGuestList] = useState<GuestEntry[]>(() =>
+    getActiveGuestList()
+  );
   const [isRsvpModalOpen, setIsRsvpModalOpen] = useState(false);
   const [rsvpData, setRsvpData] = useState({
     name: '',
@@ -54,10 +60,22 @@ export const Details: React.FC = () => {
   const [mapColorMode, setMapColorMode] = useState<'editorial' | 'standard'>(
     'editorial'
   );
+  const submittingLockRef = useRef(false);
+
+  // Sync live guest list and RSVP statuses
+  useEffect(() => {
+    const refreshLocal = () => setGuestList(getActiveGuestList());
+    window.addEventListener('ns-guest-list-updated', refreshLocal);
+    syncWithGoogleSheets().then(({ guests }) => {
+      setGuestList(guests);
+    });
+    return () =>
+      window.removeEventListener('ns-guest-list-updated', refreshLocal);
+  }, []);
 
   const verification = useMemo(
-    () => verifyGuestName(rsvpData.name),
-    [rsvpData.name]
+    () => verifyGuestName(rsvpData.name, guestList),
+    [rsvpData.name, guestList]
   );
 
   // Auto-open RSVP modal if query param ?rsvp=true or hash #rsvp is provided
@@ -89,7 +107,7 @@ export const Details: React.FC = () => {
     setRsvpData((prev) => ({ ...prev, name: val }));
 
     if (val.trim().length >= 2) {
-      const matches = smartMatchGuests(val, 3);
+      const matches = smartMatchGuests(val, 4, guestList);
       setSmartSuggestions(matches);
     } else {
       setSmartSuggestions([]);
@@ -101,42 +119,37 @@ export const Details: React.FC = () => {
       ...prev,
       name: guest.name,
       phone: prev.phone || guest.phone || '',
-      guests: guest.allowedGuests ? String(guest.allowedGuests) : prev.guests,
+      guests: guest.rsvpGuests
+        ? String(guest.rsvpGuests)
+        : guest.allowedGuests
+        ? String(guest.allowedGuests)
+        : prev.guests,
+      attendance:
+        guest.rsvpStatus === 'declining' ? 'declining' : prev.attendance,
+      notes: prev.notes || guest.rsvpNotes || '',
     }));
     setSmartSuggestions([]);
     setRefusalError(null);
   };
 
   const executeSubmission = async () => {
+    if (submittingLockRef.current) return;
+    submittingLockRef.current = true;
     setIsSubmitting(true);
-    const endpoint =
-      (import.meta as any).env?.VITE_RSVP_ENDPOINT ||
-      'https://script.google.com/macros/s/AKfycbyTGxdmSFL2N5hEisMyTjgGQ_aOcr06TKavP-PwevV8zwnHN6A-j8nVyk-3Vn3_rugSSA/exec';
 
-    if (endpoint) {
-      try {
-        await fetch(endpoint, {
-          method: 'POST',
-          mode: 'no-cors',
-          body: new URLSearchParams({
-            name: rsvpData.name,
-            phone: rsvpData.phone,
-            attendance: rsvpData.attendance,
-            guests: rsvpData.guests,
-            notes: rsvpData.notes,
-            submittedAt: new Date().toISOString(),
-          }),
-        });
-      } catch (err) {
-        console.error('RSVP submission failed', err);
-      }
+    try {
+      await submitGuestRsvp(rsvpData);
+      setGuestList(getActiveGuestList());
+    } finally {
+      setIsSubmitting(false);
+      setRsvpSubmitted(true);
+      submittingLockRef.current = false;
     }
-    setIsSubmitting(false);
-    setRsvpSubmitted(true);
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (submittingLockRef.current || isSubmitting) return;
     setRefusalError(null);
 
     // 1. Strict Whitelist Verification (Client-side refusal):
@@ -159,6 +172,13 @@ export const Details: React.FC = () => {
     // 3. Authorized submission:
     executeSubmission();
   };
+
+  const alreadyRsvpedGuest =
+    verification.isVerified &&
+    verification.matchedGuest?.rsvpStatus &&
+    verification.matchedGuest.rsvpStatus !== 'pending'
+      ? verification.matchedGuest
+      : null;
 
   return (
     <motion.div
@@ -669,7 +689,15 @@ export const Details: React.FC = () => {
             className="relative z-10 w-full mt-6 md:mt-8 mb-2 flex flex-col md:flex-row items-center justify-between gap-3 text-paper/85 font-sans text-[8.5px] sm:text-[9.5px] md:text-[11px] tracking-[0.3em] md:tracking-[0.35em] uppercase"
             style={{ textShadow: '0 2px 10px rgba(0,0,0,0.95)' }}
           >
-            <span>&copy; 2026 Ndumiso &amp; Sithandiwe</span>
+            <div className="flex items-center gap-4">
+              <span>&copy; 2026 Ndumiso &amp; Sithandiwe</span>
+              <Link
+                to="/admin"
+                className="text-paper/35 hover:text-[#E8D3B9] transition-colors"
+              >
+                Host Portal
+              </Link>
+            </div>
             <a
               href="https://arsonPixelz.com"
               target="_blank"
@@ -803,6 +831,25 @@ export const Details: React.FC = () => {
                             <CheckCircle2 className="w-3.5 h-3.5 text-[#E8D3B9] shrink-0" />
                             <span>Invitation confirmed for <strong>{verification.matchedGuest?.name}</strong></span>
                           </p>
+                        )}
+
+                        {/* Already RSVPed Notice to prevent duplicate submissions */}
+                        {alreadyRsvpedGuest && (
+                          <div className="mt-2.5 p-3 rounded-xl bg-[#E8D3B9]/10 border border-[#E8D3B9]/35 text-[#E8D3B9] text-[11px] flex items-start gap-2.5 leading-relaxed">
+                            <Sparkles className="w-4 h-4 shrink-0 mt-0.5 text-[#E8D3B9]" />
+                            <div>
+                              <strong>Your RSVP is already recorded</strong> (
+                              {alreadyRsvpedGuest.rsvpStatus === 'declining'
+                                ? 'Declined'
+                                : 'Attending'}{' '}
+                              &bull; {alreadyRsvpedGuest.rsvpGuests || 1}{' '}
+                              {(alreadyRsvpedGuest.rsvpGuests || 1) > 1
+                                ? 'Guests'
+                                : 'Guest'}
+                              ). You only need to submit again if you want to
+                              update your response.
+                            </div>
+                          </div>
                         )}
                       </div>
 

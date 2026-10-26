@@ -9,6 +9,7 @@ import { Home } from './pages/Home';
 import { Journey } from './pages/Journey';
 import { Details } from './pages/Details';
 import { Rsvp } from './pages/Rsvp';
+import { Admin } from './pages/Admin';
 
 const AnimatedRoutes: React.FC = () => {
   const location = useLocation();
@@ -24,6 +25,7 @@ const AnimatedRoutes: React.FC = () => {
         <Route path="/journey" element={<Journey />} />
         <Route path="/details" element={<Details />} />
         <Route path="/rsvp" element={<Rsvp />} />
+        <Route path="/admin" element={<Admin />} />
       </Routes>
     </AnimatePresence>
   );
