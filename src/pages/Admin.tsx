@@ -14,7 +14,6 @@ import {
   Clock,
   Users,
   Phone,
-  Sparkles,
   Download,
   Copy,
   Check,
@@ -1400,7 +1399,6 @@ export const Admin: React.FC = () => {
               </button>
 
               <div className="flex items-center gap-2 text-emerald-300 font-sans text-[10px] uppercase tracking-[0.3em] font-bold mb-2">
-                <Sparkles className="w-4 h-4" />
                 <span>
                   Automatic Google Sheets Deduplication, Luxury Styling &amp;
                   Bride/Bridegroom Tabs

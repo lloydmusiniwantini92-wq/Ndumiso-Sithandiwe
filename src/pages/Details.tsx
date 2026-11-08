@@ -11,7 +11,6 @@ import {
   CheckCircle2,
   UserCheck,
   AlertCircle,
-  Sparkles,
   Users,
 } from 'lucide-react';
 import { MagneticWrapper } from '../components/MagneticWrapper';
@@ -1002,7 +1001,6 @@ export const Details: React.FC = () => {
                         {/* Already RSVPed Notice to prevent duplicate submissions */}
                         {alreadyRsvpedGuest && (
                           <div className="mt-2.5 p-3 rounded-xl bg-[#E8D3B9]/10 border border-[#E8D3B9]/35 text-[#E8D3B9] text-[11px] flex items-start gap-2.5 leading-relaxed">
-                            <Sparkles className="w-4 h-4 shrink-0 mt-0.5 text-[#E8D3B9]" />
                             <div>
                               <strong>Your RSVP is already recorded</strong> (
                               {alreadyRsvpedGuest.rsvpStatus === 'declining'
