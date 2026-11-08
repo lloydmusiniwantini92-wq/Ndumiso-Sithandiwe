@@ -595,19 +595,13 @@ export const Rsvp: React.FC = () => {
           )}
 
           {/* Direct link to browse the full experience */}
-          <div className="mt-8 pt-6 border-t border-paper/10 flex flex-col sm:flex-row items-center justify-between gap-3 text-center">
+          <div className="mt-8 pt-6 border-t border-paper/10 text-center">
             <Link
               to="/details"
               className="inline-flex items-center gap-2 font-sans text-[10px] uppercase tracking-[0.25em] text-[#E8D3B9]/80 hover:text-[#E8D3B9] transition-colors"
             >
               <span>Explore Wedding Details &amp; Dress Code</span>
               <ArrowRight className="w-3.5 h-3.5" />
-            </Link>
-            <Link
-              to="/admin"
-              className="font-sans text-[9.5px] uppercase tracking-[0.22em] text-paper/35 hover:text-[#E8D3B9] transition-colors"
-            >
-              Host Portal
             </Link>
           </div>
         </motion.div>

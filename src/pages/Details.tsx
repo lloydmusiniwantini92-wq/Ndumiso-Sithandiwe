@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { useSearchParams, useLocation, Link } from 'react-router-dom';
+import { useSearchParams, useLocation } from 'react-router-dom';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import {
@@ -754,12 +754,6 @@ export const Details: React.FC = () => {
           >
             <div className="flex items-center gap-4">
               <span>&copy; 2026 Ndumiso &amp; Sithandiwe</span>
-              <Link
-                to="/admin"
-                className="text-paper/35 hover:text-[#E8D3B9] transition-colors"
-              >
-                Host Portal
-              </Link>
             </div>
             <a
               href="https://arsonPixelz.com"
