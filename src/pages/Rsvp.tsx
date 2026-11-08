@@ -8,6 +8,7 @@ import {
   UserCheck,
   AlertCircle,
   Sparkles,
+  Users,
 } from 'lucide-react';
 import { weddingEventConfig } from '../data/weddingData';
 import {
@@ -17,6 +18,7 @@ import {
   syncWithGoogleSheets,
   submitGuestRsvp,
   GuestEntry,
+  GuestSide,
 } from '../data/guestListData';
 
 const tSettings = { duration: 1.2, ease: [0.76, 0, 0.24, 1] as const };
@@ -34,6 +36,10 @@ export const Rsvp: React.FC = () => {
   const navigate = useNavigate();
   const [guestList, setGuestList] = useState<GuestEntry[]>(() =>
     getActiveGuestList()
+  );
+  const [selectedSide, setSelectedSide] = useState<GuestSide | 'ALL'>('ALL');
+  const [selectedGuestId, setSelectedGuestId] = useState<number | undefined>(
+    undefined
   );
   const [rsvpData, setRsvpData] = useState({
     name: '',
@@ -61,8 +67,14 @@ export const Rsvp: React.FC = () => {
   }, []);
 
   const verification = useMemo(
-    () => verifyGuestName(rsvpData.name, guestList),
-    [rsvpData.name, guestList]
+    () =>
+      verifyGuestName(
+        rsvpData.name,
+        guestList,
+        selectedSide,
+        selectedGuestId
+      ),
+    [rsvpData.name, guestList, selectedSide, selectedGuestId]
   );
 
   // Auto-redirect after submission
@@ -83,12 +95,24 @@ export const Rsvp: React.FC = () => {
     return () => clearInterval(interval);
   }, [rsvpSubmitted, navigate]);
 
+  const handleSideChange = (side: GuestSide | 'ALL') => {
+    setSelectedSide(side);
+    setSelectedGuestId(undefined);
+    setRefusalError(null);
+    if (rsvpData.name.trim().length >= 2) {
+      setSmartSuggestions(
+        smartMatchGuests(rsvpData.name, 6, guestList, side)
+      );
+    }
+  };
+
   const handleNameChange = (val: string) => {
     setRefusalError(null);
+    setSelectedGuestId(undefined);
     setRsvpData((prev) => ({ ...prev, name: val }));
 
     if (val.trim().length >= 2) {
-      const matches = smartMatchGuests(val, 4, guestList);
+      const matches = smartMatchGuests(val, 6, guestList, selectedSide);
       setSmartSuggestions(matches);
     } else {
       setSmartSuggestions([]);
@@ -96,6 +120,8 @@ export const Rsvp: React.FC = () => {
   };
 
   const handleSelectGuest = (guest: GuestEntry) => {
+    setSelectedSide(guest.side);
+    setSelectedGuestId(guest.id);
     setRsvpData((prev) => ({
       ...prev,
       name: guest.name,
@@ -119,7 +145,14 @@ export const Rsvp: React.FC = () => {
     setIsSubmitting(true);
 
     try {
-      await submitGuestRsvp(rsvpData);
+      const resolvedSide: GuestSide =
+        verification.matchedGuest?.side ||
+        (selectedSide !== 'ALL' ? selectedSide : 'BRIDE');
+      await submitGuestRsvp({
+        ...rsvpData,
+        side: resolvedSide,
+        guestId: verification.matchedGuest?.id || selectedGuestId,
+      });
       setGuestList(getActiveGuestList());
     } finally {
       setIsSubmitting(false);
@@ -133,10 +166,43 @@ export const Rsvp: React.FC = () => {
     if (submittingLockRef.current || isSubmitting) return;
     setRefusalError(null);
 
+    // 0. If multiple family members match a single surname (e.g. "Masuku", "Chirwa", "Ndlovu"), prompt selection
+    if (
+      !verification.isVerified &&
+      verification.ambiguousMatches &&
+      verification.ambiguousMatches.length > 1
+    ) {
+      setSmartSuggestions(verification.ambiguousMatches);
+      setRefusalError(
+        `Multiple invited guests match "${rsvpData.name}". Please tap your exact full name from the suggestions above.`
+      );
+      return;
+    }
+
+    // 0b. If the exact name exists on both Bride and Bridegroom lists and user hasn't picked a side
+    if (
+      verification.ambiguousMatches &&
+      verification.ambiguousMatches.length > 1 &&
+      selectedSide === 'ALL' &&
+      !selectedGuestId
+    ) {
+      setSmartSuggestions(verification.ambiguousMatches);
+      setRefusalError(
+        `Please select whether you are RSVPing under Bride (Sithandiwe) or Bridegroom (Ndumiso) above.`
+      );
+      return;
+    }
+
     // 1. Strict Whitelist Verification (Client-side refusal):
     if (!verification.isVerified) {
       setRefusalError(
-        `"${rsvpData.name}" was not found on the invited wedding guest list. RSVPs are strictly reserved for invited guests. Please check your spelling or contact the couple directly.`
+        `"${rsvpData.name}" was not found on the ${
+          selectedSide === 'BRIDE'
+            ? "Bride's (Sithandiwe)"
+            : selectedSide === 'BRIDEGROOM'
+            ? "Bridegroom's (Ndumiso)"
+            : 'invited wedding'
+        } guest list. Try switching between Bride / Bridegroom above or check your spelling.`
       );
       return;
     }
@@ -190,7 +256,7 @@ export const Rsvp: React.FC = () => {
           className="bg-[#0E0E0E]/85 backdrop-blur-xl border border-[#E8D3B9]/35 rounded-3xl p-6 sm:p-10 md:p-12 shadow-[0_25px_80px_rgba(0,0,0,0.95)]"
         >
           {/* Header */}
-          <div className="text-center mb-8">
+          <div className="text-center mb-7">
             <div className="flex items-center justify-center gap-2 mb-3">
               <span className="w-2 h-2 rounded-full bg-[#E8D3B9] shadow-[0_0_10px_#E8D3B9]" />
               <span className="font-sans text-[10px] tracking-[0.45em] uppercase text-[#E8D3B9] font-bold">
@@ -223,9 +289,12 @@ export const Rsvp: React.FC = () => {
                 Response Recorded
               </h2>
               <p className="font-sans text-xs tracking-wider text-paper/85 leading-relaxed max-w-sm mx-auto mb-4">
-                Thank you! Your RSVP is confirmed on our guest list (no need to
-                submit again). We look forward to celebrating with you at
-                Lakeside Events in Bulawayo!
+                Thank you! Your RSVP is confirmed on our{' '}
+                {verification.matchedGuest?.side === 'BRIDEGROOM'
+                  ? "Bridegroom's (Ndumiso)"
+                  : "Bride's (Sithandiwe)"}{' '}
+                guest list (no need to submit again). We look forward to
+                celebrating with you at Lakeside Events in Bulawayo!
               </p>
 
               <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-paper/5 border border-[#E8D3B9]/30 text-[#E8D3B9] text-[10.5px] font-sans tracking-widest uppercase mb-8">
@@ -250,16 +319,88 @@ export const Rsvp: React.FC = () => {
               onSubmit={handleSubmit}
               className="flex flex-col gap-5 text-left"
             >
+              {/* Family Side Selector: BRIDE (Sithandiwe) vs BRIDEGROOM (Ndumiso) */}
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <label className="font-sans text-[10px] tracking-[0.3em] uppercase text-paper/70 font-medium flex items-center gap-1.5">
+                    <Users className="w-3 h-3 text-[#E8D3B9]" />
+                    <span>Select Family Side</span>
+                  </label>
+                  {selectedSide !== 'ALL' && (
+                    <button
+                      type="button"
+                      onClick={() => handleSideChange('ALL')}
+                      className="text-[9.5px] font-sans uppercase tracking-widest text-paper/45 hover:text-[#E8D3B9] transition-colors cursor-pointer"
+                    >
+                      Search Both Sides
+                    </button>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-2 gap-2.5">
+                  <button
+                    type="button"
+                    onClick={() => handleSideChange('BRIDE')}
+                    className={`py-3 px-3 rounded-xl border text-center transition-all cursor-pointer flex flex-col items-center justify-center gap-0.5 ${
+                      selectedSide === 'BRIDE'
+                        ? 'bg-[#E8D3B9] text-ink border-[#E8D3B9] shadow-[0_0_20px_rgba(232,211,185,0.25)]'
+                        : 'bg-paper/5 text-paper/80 border-paper/15 hover:border-[#E8D3B9]/50'
+                    }`}
+                  >
+                    <span className="font-sans text-[9.5px] uppercase tracking-[0.25em] font-bold">
+                      Bride&apos;s Side
+                    </span>
+                    <span
+                      className={`font-serif italic text-xs ${
+                        selectedSide === 'BRIDE'
+                          ? 'text-ink/85 font-semibold'
+                          : 'text-[#E8D3B9]'
+                      }`}
+                    >
+                      Sithandiwe&apos;s Family &amp; Guests
+                    </span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleSideChange('BRIDEGROOM')}
+                    className={`py-3 px-3 rounded-xl border text-center transition-all cursor-pointer flex flex-col items-center justify-center gap-0.5 ${
+                      selectedSide === 'BRIDEGROOM'
+                        ? 'bg-[#E8D3B9] text-ink border-[#E8D3B9] shadow-[0_0_20px_rgba(232,211,185,0.25)]'
+                        : 'bg-paper/5 text-paper/80 border-paper/15 hover:border-[#E8D3B9]/50'
+                    }`}
+                  >
+                    <span className="font-sans text-[9.5px] uppercase tracking-[0.25em] font-bold">
+                      Bridegroom&apos;s Side
+                    </span>
+                    <span
+                      className={`font-serif italic text-xs ${
+                        selectedSide === 'BRIDEGROOM'
+                          ? 'text-ink/85 font-semibold'
+                          : 'text-[#E8D3B9]'
+                      }`}
+                    >
+                      Ndumiso&apos;s Family &amp; Guests
+                    </span>
+                  </button>
+                </div>
+              </div>
+
               {/* Full Name Field with Intelligent Matching */}
               <div>
                 <div className="flex items-center justify-between mb-2">
                   <label className="font-sans text-[10px] tracking-[0.3em] uppercase text-paper/70 font-medium">
                     Your Full Name *
                   </label>
-                  {verification.isVerified && (
+                  {verification.isVerified && verification.matchedGuest && (
                     <span className="inline-flex items-center gap-1 text-[10px] uppercase tracking-wider text-[#E8D3B9] font-medium">
                       <UserCheck className="w-3 h-3 text-[#E8D3B9]" />
-                      <span>Verified Guest</span>
+                      <span>
+                        Verified &bull;{' '}
+                        {verification.matchedGuest.side === 'BRIDEGROOM'
+                          ? 'Bridegroom'
+                          : 'Bride'}
+                      </span>
                     </span>
                   )}
                 </div>
@@ -268,7 +409,13 @@ export const Rsvp: React.FC = () => {
                   required
                   type="text"
                   autoComplete="off"
-                  placeholder="e.g. Peter Mpofu or Sithandiwe"
+                  placeholder={
+                    selectedSide === 'BRIDEGROOM'
+                      ? 'e.g. Musa Masuku, Delight Chirwa, or Aunt Nande'
+                      : selectedSide === 'BRIDE'
+                      ? 'e.g. Peter Mpofu, Julie, or Mr and Mrs Sibanda'
+                      : 'Start typing your name (e.g. Musa Masuku or Peter Mpofu)...'
+                  }
                   value={rsvpData.name}
                   onChange={(e) => handleNameChange(e.target.value)}
                   className={`w-full bg-paper/5 border rounded-xl px-4 py-3 text-sm text-paper placeholder:text-paper/25 focus:outline-none transition-colors ${
@@ -280,32 +427,51 @@ export const Rsvp: React.FC = () => {
                   }`}
                 />
 
-                {/* Intelligent Suggestion Pills */}
-                {!verification.isVerified && smartSuggestions.length > 0 && (
-                  <div className="flex flex-wrap items-center gap-1.5 mt-2.5">
-                    <span className="text-[10px] uppercase tracking-widest text-[#E8D3B9]/60 font-medium">
-                      Select name:
-                    </span>
-                    {smartSuggestions.map((g) => (
-                      <button
-                        key={g.id}
-                        type="button"
-                        onClick={() => handleSelectGuest(g)}
-                        className="px-2.5 py-1 rounded-full bg-[#E8D3B9]/15 border border-[#E8D3B9]/35 text-[#E8D3B9] text-xs hover:bg-[#E8D3B9]/25 hover:border-[#E8D3B9] transition-all cursor-pointer font-serif italic"
-                      >
-                        {g.name}
-                      </button>
-                    ))}
-                  </div>
-                )}
+                {/* Intelligent Suggestion Pills with Bride / Bridegroom Badges */}
+                {(!verification.isVerified ||
+                  (verification.ambiguousMatches &&
+                    verification.ambiguousMatches.length > 1 &&
+                    !selectedGuestId)) &&
+                  (smartSuggestions.length > 0 ||
+                    (verification.ambiguousMatches &&
+                      verification.ambiguousMatches.length > 0)) && (
+                    <div className="flex flex-wrap items-center gap-1.5 mt-2.5">
+                      <span className="text-[10px] uppercase tracking-widest text-[#E8D3B9]/70 font-medium w-full mb-0.5">
+                        Tap your name to auto-fill:
+                      </span>
+                      {(verification.ambiguousMatches &&
+                      verification.ambiguousMatches.length > 1
+                        ? verification.ambiguousMatches
+                        : smartSuggestions
+                      ).map((g) => (
+                        <button
+                          key={g.id}
+                          type="button"
+                          onClick={() => handleSelectGuest(g)}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#E8D3B9]/15 border border-[#E8D3B9]/40 text-[#E8D3B9] text-xs hover:bg-[#E8D3B9] hover:text-ink transition-all cursor-pointer group"
+                        >
+                          <span className="font-serif italic font-medium">
+                            {g.name}
+                          </span>
+                          <span className="text-[9px] font-sans uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-black/30 text-[#E8D3B9]/80 group-hover:bg-ink/15 group-hover:text-ink">
+                            {g.side === 'BRIDEGROOM' ? 'Bridegroom' : 'Bride'}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
 
                 {/* Verified Confirmation */}
-                {verification.isVerified && (
+                {verification.isVerified && verification.matchedGuest && (
                   <p className="text-[11px] text-[#E8D3B9]/90 mt-2 flex items-center gap-1.5">
                     <CheckCircle2 className="w-3.5 h-3.5 text-[#E8D3B9] shrink-0" />
                     <span>
                       Invitation confirmed for{' '}
-                      <strong>{verification.matchedGuest?.name}</strong>
+                      <strong>{verification.matchedGuest.name}</strong> (
+                      {verification.matchedGuest.side === 'BRIDEGROOM'
+                        ? "Bridegroom's Side — Ndumiso"
+                        : "Bride's Side — Sithandiwe"}
+                      )
                     </span>
                   </p>
                 )}
@@ -405,7 +571,7 @@ export const Rsvp: React.FC = () => {
                   <AlertCircle className="w-5 h-5 text-rose-400 shrink-0 mt-0.5" />
                   <div>
                     <p className="font-semibold text-rose-100 mb-0.5">
-                      RSVP Not Permitted
+                      Action Required
                     </p>
                     <p className="text-rose-200/90">{refusalError}</p>
                   </div>

@@ -26,6 +26,9 @@ const AnimatedRoutes: React.FC = () => {
         <Route path="/details" element={<Details />} />
         <Route path="/rsvp" element={<Rsvp />} />
         <Route path="/admin" element={<Admin />} />
+        <Route path="/details/admin" element={<Admin />} />
+        <Route path="/rsvp/admin" element={<Admin />} />
+        <Route path="/journey/admin" element={<Admin />} />
       </Routes>
     </AnimatePresence>
   );

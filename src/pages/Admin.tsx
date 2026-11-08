@@ -25,6 +25,7 @@ import {
 } from 'lucide-react';
 import {
   GuestEntry,
+  GuestSide,
   DEFAULT_GUEST_LIST,
   getActiveGuestList,
   saveActiveGuestListLocal,
@@ -49,6 +50,7 @@ export const Admin: React.FC = () => {
   const [guests, setGuests] = useState<GuestEntry[]>(() =>
     getActiveGuestList()
   );
+  const [sideFilter, setSideFilter] = useState<'ALL' | GuestSide>('ALL');
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<
     'all' | 'attending' | 'declining' | 'pending' | 'replaced'
@@ -68,6 +70,7 @@ export const Admin: React.FC = () => {
   const [editModalGuest, setEditModalGuest] = useState<GuestEntry | null>(null);
   const [editForm, setEditForm] = useState({
     name: '',
+    side: 'BRIDE' as GuestSide,
     phone: '',
     allowedGuests: '1',
     rsvpStatus: 'pending' as 'pending' | 'attending' | 'declining',
@@ -78,6 +81,7 @@ export const Admin: React.FC = () => {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [addForm, setAddForm] = useState({
     name: '',
+    side: 'BRIDEGROOM' as GuestSide,
     phone: '',
     allowedGuests: '1',
   });
@@ -89,7 +93,7 @@ export const Admin: React.FC = () => {
     setToastMessage(msg);
     setTimeout(() => {
       setToastMessage((prev) => (prev === msg ? null : prev));
-    }, 4000);
+    }, 4500);
   };
 
   useEffect(() => {
@@ -113,15 +117,17 @@ export const Admin: React.FC = () => {
     try {
       const res = await syncWithGoogleSheets();
       setGuests(res.guests);
+      // Also push the merged 177-guest list (Bride + Bridegroom) back so Google Sheets has both tabs
+      await pushAdminUpdateToGoogleSheets('styleAndSyncSheets', res.guests);
       if (!silent) {
         if (res.syncedFromCloud) {
           showToast(
             res.duplicatesRemoved
-              ? `Synced live with Google Sheets & removed ${res.duplicatesRemoved} duplicate RSVP(s)!`
-              : 'Synced live with Google Sheets!'
+              ? `Synced & styled Google Sheets (removed ${res.duplicatesRemoved} duplicate RSVP rows)!`
+              : 'Synced & styled Bride + Bridegroom tabs in Google Sheets!'
           );
         } else {
-          showToast('Guest list saved & up to date!');
+          showToast('Guest list saved & pushed to Google Sheets!');
         }
       }
     } finally {
@@ -132,12 +138,12 @@ export const Admin: React.FC = () => {
   const handleCleanDuplicatesNow = async () => {
     setIsSyncing(true);
     try {
-      await pushAdminUpdateToGoogleSheets('deduplicateSheet', guests, {
+      await pushAdminUpdateToGoogleSheets('styleAndSyncSheets', guests, {
         deduplicate: 'true',
       });
       await handleSync(true);
       showToast(
-        'Deduplication command sent to Google Sheets & guest list synced!'
+        'Deduplication & luxury styling sent to Google Sheets (Bride & Bridegroom tabs updated)!'
       );
     } finally {
       setIsSyncing(false);
@@ -185,6 +191,7 @@ export const Admin: React.FC = () => {
 
     await pushAdminUpdateToGoogleSheets('replaceGuest', updatedList, {
       guestId: String(replaceModalGuest.id),
+      side: replaceModalGuest.side,
       oldName,
       newName,
       newPhone,
@@ -201,6 +208,7 @@ export const Admin: React.FC = () => {
     setEditModalGuest(guest);
     setEditForm({
       name: guest.name,
+      side: guest.side || (guest.id <= 95 ? 'BRIDE' : 'BRIDEGROOM'),
       phone: guest.phone || '',
       allowedGuests: String(guest.allowedGuests || 1),
       rsvpStatus: guest.rsvpStatus || 'pending',
@@ -222,6 +230,7 @@ export const Admin: React.FC = () => {
       return {
         ...g,
         name: updatedName,
+        side: editForm.side,
         phone: updatedPhone,
         allowedGuests,
         rsvpStatus: editForm.rsvpStatus,
@@ -242,6 +251,7 @@ export const Admin: React.FC = () => {
 
     await pushAdminUpdateToGoogleSheets('updateGuest', updatedList, {
       guestId: String(editModalGuest.id),
+      side: editForm.side,
       name: updatedName,
       phone: updatedPhone,
       allowedGuests: String(allowedGuests),
@@ -250,7 +260,7 @@ export const Admin: React.FC = () => {
       rsvpNotes: editForm.rsvpNotes.trim(),
     });
 
-    showToast(`Updated details for "${updatedName}"!`);
+    showToast(`Updated details for "${updatedName}" (${editForm.side})!`);
   };
 
   // Add New Guest
@@ -258,11 +268,11 @@ export const Admin: React.FC = () => {
     e.preventDefault();
     if (!addForm.name.trim()) return;
 
-    const nextId =
-      guests.reduce((max, g) => Math.max(max, g.id), 0) + 1;
+    const nextId = guests.reduce((max, g) => Math.max(max, g.id), 0) + 1;
     const newGuest: GuestEntry = {
       id: nextId,
       name: addForm.name.trim(),
+      side: addForm.side,
       phone: formatDisplayPhone(addForm.phone),
       allowedGuests: Number(addForm.allowedGuests) || 1,
       rsvpStatus: 'pending',
@@ -271,10 +281,17 @@ export const Admin: React.FC = () => {
     const updatedList = [...guests, newGuest];
     setGuests(updatedList);
     setIsAddModalOpen(false);
-    setAddForm({ name: '', phone: '', allowedGuests: '1' });
+    setAddForm({
+      name: '',
+      side: sideFilter === 'ALL' ? 'BRIDEGROOM' : sideFilter,
+      phone: '',
+      allowedGuests: '1',
+    });
 
     await pushAdminUpdateToGoogleSheets('saveGuestList', updatedList);
-    showToast(`Added "${newGuest.name}" (#${nextId}) to the guest list!`);
+    showToast(
+      `Added "${newGuest.name}" (#${nextId} • ${newGuest.side}) to the guest list!`
+    );
   };
 
   // Remove Guest
@@ -292,10 +309,11 @@ export const Admin: React.FC = () => {
     showToast(`Removed "${guest.name}" from the guest list.`);
   };
 
-  // Export Clean CSV
+  // Export Clean CSV (includes Family Side column)
   const handleExportCsv = () => {
     const headers = [
       'Invite #',
+      'Family Side',
       'Guest Name',
       'Phone / WhatsApp',
       'Max Allowed Guests',
@@ -304,8 +322,15 @@ export const Admin: React.FC = () => {
       'Dietary / Notes',
       'Replaced Previous Guest',
     ];
-    const rows = guests.map((g) => [
+    const sourceList =
+      sideFilter === 'ALL'
+        ? guests
+        : guests.filter((g) => g.side === sideFilter);
+    const rows = sourceList.map((g) => [
       g.id,
+      g.side === 'BRIDEGROOM'
+        ? 'BRIDEGROOM (Ndumiso)'
+        : 'BRIDE (Sithandiwe)',
       `"${(g.name || '').replace(/"/g, '""')}"`,
       `"${formatDisplayPhone(g.phone)}"`,
       g.allowedGuests || 1,
@@ -322,7 +347,7 @@ export const Admin: React.FC = () => {
     link.setAttribute('href', encodedUri);
     link.setAttribute(
       'download',
-      `Ndumiso_Sithandiwe_Clean_GuestList_${new Date()
+      `Ndumiso_Sithandiwe_${sideFilter}_GuestList_${new Date()
         .toISOString()
         .slice(0, 10)}.csv`
     );
@@ -331,30 +356,68 @@ export const Admin: React.FC = () => {
     document.body.removeChild(link);
   };
 
-  // Reset to latest 30 Dec Final Guestlist baseline
+  // Reset to latest 177-guest Bride & Bridegroom baseline
   const handleResetToFinalBaseline = async () => {
     if (
       !window.confirm(
-        'Sync local list with the 30 December Final Guestlist baseline while keeping existing RSVPs?'
+        'Sync local list with the complete 177-invite Bride (95) + Bridegroom (82) baseline while keeping all existing RSVPs?'
       )
     ) {
       return;
     }
     saveActiveGuestListLocal(DEFAULT_GUEST_LIST);
     setGuests(DEFAULT_GUEST_LIST);
-    await pushAdminUpdateToGoogleSheets('saveGuestList', DEFAULT_GUEST_LIST);
-    showToast('Synced with 30 December Final Guestlist!');
+    await pushAdminUpdateToGoogleSheets(
+      'styleAndSyncSheets',
+      DEFAULT_GUEST_LIST
+    );
+    showToast(
+      'Synced complete 177-invite Bride (95) & Bridegroom (82) baseline!'
+    );
   };
 
-  // Computed Stats
+  // Computed Stats (Scoped by Side Filter + Side Breakdowns)
   const stats = useMemo(() => {
+    const scopedGuests =
+      sideFilter === 'ALL'
+        ? guests
+        : guests.filter((g) => g.side === sideFilter);
+
     let attendingInvites = 0;
     let attendingHeadcount = 0;
     let decliningInvites = 0;
     let pendingInvites = 0;
     let replacedCount = 0;
 
+    let brideTotal = 0;
+    let brideAttending = 0;
+    let brideSeats = 0;
+
+    let groomTotal = 0;
+    let groomAttending = 0;
+    let groomSeats = 0;
+
     for (const g of guests) {
+      const seats =
+        g.rsvpStatus === 'attending'
+          ? g.rsvpGuests || g.allowedGuests || 1
+          : 0;
+      if (g.side === 'BRIDEGROOM') {
+        groomTotal++;
+        if (g.rsvpStatus === 'attending') {
+          groomAttending++;
+          groomSeats += seats;
+        }
+      } else {
+        brideTotal++;
+        if (g.rsvpStatus === 'attending') {
+          brideAttending++;
+          brideSeats += seats;
+        }
+      }
+    }
+
+    for (const g of scopedGuests) {
       if (g.replacedGuest) replacedCount++;
       if (g.rsvpStatus === 'attending') {
         attendingInvites++;
@@ -367,19 +430,26 @@ export const Admin: React.FC = () => {
     }
 
     return {
-      totalInvites: guests.length,
+      totalInvites: scopedGuests.length,
       attendingInvites,
       attendingHeadcount,
       decliningInvites,
       pendingInvites,
       replacedCount,
+      brideTotal,
+      brideAttending,
+      brideSeats,
+      groomTotal,
+      groomAttending,
+      groomSeats,
     };
-  }, [guests]);
+  }, [guests, sideFilter]);
 
   // Filtered Guests
   const filteredGuests = useMemo(() => {
     const q = searchQuery.toLowerCase().trim();
     return guests.filter((g) => {
+      if (sideFilter !== 'ALL' && g.side !== sideFilter) return false;
       if (statusFilter === 'attending' && g.rsvpStatus !== 'attending')
         return false;
       if (statusFilter === 'declining' && g.rsvpStatus !== 'declining')
@@ -400,7 +470,7 @@ export const Admin: React.FC = () => {
         String(g.id) === q
       );
     });
-  }, [guests, searchQuery, statusFilter]);
+  }, [guests, sideFilter, searchQuery, statusFilter]);
 
   if (!isUnlocked) {
     return (
@@ -416,8 +486,9 @@ export const Admin: React.FC = () => {
             Host Guest Portal
           </h1>
           <p className="font-sans text-xs text-paper/65 mb-6 leading-relaxed">
-            Enter the wedding host PIN to manage guest names, phone numbers, and
-            standby replacements directly on the website.
+            Enter the wedding host PIN to manage Bride (Sithandiwe) &amp;
+            Bridegroom (Ndumiso) guest lists, phone numbers, and standby
+            replacements.
           </p>
 
           <form onSubmit={handlePinSubmit} className="flex flex-col gap-4">
@@ -477,26 +548,32 @@ export const Admin: React.FC = () => {
 
       <div className="max-w-6xl mx-auto">
         {/* Header Bar */}
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 mb-8 bg-[#121212] border border-[#E8D3B9]/25 rounded-3xl p-6 sm:p-8">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 mb-6 bg-[#121212] border border-[#E8D3B9]/25 rounded-3xl p-6 sm:p-8">
           <div>
             <div className="flex items-center gap-2 text-[#E8D3B9] font-sans text-[10px] tracking-[0.35em] uppercase font-bold mb-2">
               <ShieldCheck className="w-4 h-4" />
               <span>Self-Service Host Portal &bull; 30 Dec 2026</span>
             </div>
             <h1 className="font-serif text-3xl sm:text-4xl md:text-5xl italic font-light text-paper">
-              Guest List &amp; Standby Manager
+              Bride &amp; Bridegroom Guest Manager
             </h1>
             <p className="font-sans text-xs text-paper/65 mt-2 max-w-2xl leading-relaxed">
-              Edit guest names, add or fix phone numbers, and swap unavailable
-              guests with standby replacements without losing any existing
-              RSVPs.
+              Manage Sithandiwe&apos;s (Bride) and Ndumiso&apos;s (Bridegroom)
+              family guest lists, deduplicate &amp; style Google Sheets, and
+              swap standby guests without losing any existing RSVPs.
             </p>
           </div>
 
           <div className="flex flex-wrap items-center gap-2.5">
             <button
               type="button"
-              onClick={() => setIsAddModalOpen(true)}
+              onClick={() => {
+                setAddForm((prev) => ({
+                  ...prev,
+                  side: sideFilter === 'ALL' ? 'BRIDEGROOM' : sideFilter,
+                }));
+                setIsAddModalOpen(true);
+              }}
               className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#E8D3B9] text-ink font-sans text-[11px] tracking-[0.18em] uppercase font-bold hover:bg-[#FAF8F5] transition-all cursor-pointer"
             >
               <UserPlus className="w-4 h-4" />
@@ -512,7 +589,7 @@ export const Admin: React.FC = () => {
               <RefreshCw
                 className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin' : ''}`}
               />
-              <span>Sync &amp; Deduplicate</span>
+              <span>Sync, Deduplicate &amp; Style Sheet</span>
             </button>
 
             <button
@@ -521,7 +598,7 @@ export const Admin: React.FC = () => {
               className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-paper/5 border border-paper/15 text-paper/85 font-sans text-[11px] tracking-[0.15em] uppercase hover:border-[#E8D3B9] transition-all cursor-pointer"
             >
               <Download className="w-3.5 h-3.5" />
-              <span>Export Clean Excel/CSV</span>
+              <span>Export Clean CSV</span>
             </button>
 
             <button
@@ -530,16 +607,101 @@ export const Admin: React.FC = () => {
               className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-950/50 border border-emerald-500/40 text-emerald-200 font-sans text-[11px] tracking-[0.15em] uppercase hover:bg-emerald-900/50 transition-all cursor-pointer"
             >
               <Code2 className="w-3.5 h-3.5" />
-              <span>Sheet Auto-Clean Script</span>
+              <span>Sheet Auto-Style &amp; Clean Script</span>
             </button>
           </div>
+        </div>
+
+        {/* BRIDE vs BRIDEGROOM Category Switcher Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5 mb-6">
+          <button
+            type="button"
+            onClick={() => setSideFilter('ALL')}
+            className={`p-5 rounded-2xl border text-left transition-all cursor-pointer ${
+              sideFilter === 'ALL'
+                ? 'bg-[#1A1714] border-[#E8D3B9] shadow-[0_0_25px_rgba(232,211,185,0.15)]'
+                : 'bg-[#121212] border-paper/10 hover:border-paper/25'
+            }`}
+          >
+            <div className="flex items-center justify-between mb-1.5">
+              <span className="font-sans text-[10px] uppercase tracking-[0.28em] text-[#E8D3B9] font-bold">
+                Combined Master List
+              </span>
+              <span className="px-2 py-0.5 rounded-full bg-[#E8D3B9]/15 text-[#E8D3B9] font-sans text-[10px] font-bold">
+                {guests.length} Invites
+              </span>
+            </div>
+            <div className="font-serif text-2xl italic text-paper">
+              Both Families (Bride &amp; Bridegroom)
+            </div>
+            <div className="text-[11px] text-paper/60 mt-1.5 font-sans">
+              {stats.brideAttending + stats.groomAttending} Attending &bull;{' '}
+              {stats.brideSeats + stats.groomSeats} Confirmed Seats
+            </div>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setSideFilter('BRIDE')}
+            className={`p-5 rounded-2xl border text-left transition-all cursor-pointer ${
+              sideFilter === 'BRIDE'
+                ? 'bg-pink-950/35 border-pink-400/80 shadow-[0_0_25px_rgba(244,114,182,0.18)]'
+                : 'bg-[#121212] border-paper/10 hover:border-pink-400/40'
+            }`}
+          >
+            <div className="flex items-center justify-between mb-1.5">
+              <span className="font-sans text-[10px] uppercase tracking-[0.28em] text-pink-300 font-bold">
+                Bride&apos;s Side
+              </span>
+              <span className="px-2 py-0.5 rounded-full bg-pink-500/20 text-pink-200 font-sans text-[10px] font-bold">
+                {stats.brideTotal} Invites
+              </span>
+            </div>
+            <div className="font-serif text-2xl italic text-paper">
+              Sithandiwe&apos;s Family &amp; Guests
+            </div>
+            <div className="text-[11px] text-pink-200/80 mt-1.5 font-sans">
+              {stats.brideAttending} Attending &bull; {stats.brideSeats}{' '}
+              Confirmed Seats
+            </div>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setSideFilter('BRIDEGROOM')}
+            className={`p-5 rounded-2xl border text-left transition-all cursor-pointer ${
+              sideFilter === 'BRIDEGROOM'
+                ? 'bg-sky-950/35 border-sky-400/80 shadow-[0_0_25px_rgba(56,189,248,0.18)]'
+                : 'bg-[#121212] border-paper/10 hover:border-sky-400/40'
+            }`}
+          >
+            <div className="flex items-center justify-between mb-1.5">
+              <span className="font-sans text-[10px] uppercase tracking-[0.28em] text-sky-300 font-bold">
+                Bridegroom&apos;s Side
+              </span>
+              <span className="px-2 py-0.5 rounded-full bg-sky-500/20 text-sky-200 font-sans text-[10px] font-bold">
+                {stats.groomTotal} Invites
+              </span>
+            </div>
+            <div className="font-serif text-2xl italic text-paper">
+              Ndumiso&apos;s Family &amp; Guests
+            </div>
+            <div className="text-[11px] text-sky-200/80 mt-1.5 font-sans">
+              {stats.groomAttending} Attending &bull; {stats.groomSeats}{' '}
+              Confirmed Seats
+            </div>
+          </button>
         </div>
 
         {/* Summary Metric Cards */}
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4 mb-8">
           <div className="bg-[#121212] border border-paper/10 rounded-2xl p-4 sm:p-5">
             <div className="flex items-center justify-between text-paper/50 text-[10px] font-sans uppercase tracking-widest mb-2">
-              <span>Total Invites</span>
+              <span>
+                {sideFilter === 'ALL'
+                  ? 'Total Invites'
+                  : `${sideFilter} Invites`}
+              </span>
               <Users className="w-4 h-4 text-[#E8D3B9]" />
             </div>
             <div className="font-serif text-3xl text-paper">
@@ -619,9 +781,15 @@ export const Admin: React.FC = () => {
           <div className="flex flex-wrap items-center gap-1.5 bg-[#141414] border border-paper/10 rounded-2xl p-1.5">
             {(
               [
-                { id: 'all', label: `All (${guests.length})` },
-                { id: 'attending', label: `Attending (${stats.attendingInvites})` },
-                { id: 'declining', label: `Declined (${stats.decliningInvites})` },
+                { id: 'all', label: `All (${stats.totalInvites})` },
+                {
+                  id: 'attending',
+                  label: `Attending (${stats.attendingInvites})`,
+                },
+                {
+                  id: 'declining',
+                  label: `Declined (${stats.decliningInvites})`,
+                },
                 { id: 'pending', label: `Pending (${stats.pendingInvites})` },
                 { id: 'replaced', label: `Swapped (${stats.replacedCount})` },
               ] as const
@@ -653,6 +821,7 @@ export const Admin: React.FC = () => {
               filteredGuests.map((guest) => {
                 const isAttending = guest.rsvpStatus === 'attending';
                 const isDeclining = guest.rsvpStatus === 'declining';
+                const isGroom = guest.side === 'BRIDEGROOM';
 
                 return (
                   <div
@@ -669,6 +838,18 @@ export const Admin: React.FC = () => {
                           <h3 className="font-serif text-lg sm:text-xl text-paper font-medium">
                             {guest.name}
                           </h3>
+
+                          <span
+                            className={`px-2.5 py-0.5 rounded-full font-sans text-[9.5px] uppercase tracking-wider font-bold border ${
+                              isGroom
+                                ? 'bg-sky-950/80 border-sky-400/40 text-sky-200'
+                                : 'bg-pink-950/80 border-pink-400/40 text-pink-200'
+                            }`}
+                          >
+                            {isGroom
+                              ? 'Bridegroom • Ndumiso'
+                              : 'Bride • Sithandiwe'}
+                          </span>
 
                           {(guest.allowedGuests || 1) > 1 && (
                             <span className="px-2 py-0.5 rounded-full bg-[#E8D3B9]/15 border border-[#E8D3B9]/30 text-[#E8D3B9] font-sans text-[9.5px] uppercase tracking-wider">
@@ -727,7 +908,7 @@ export const Admin: React.FC = () => {
                       </div>
                     </div>
 
-                    {/* Action Buttons for Sithandiwe / Host */}
+                    {/* Action Buttons for Host */}
                     <div className="flex flex-wrap items-center gap-2 sm:shrink-0">
                       <button
                         type="button"
@@ -786,7 +967,7 @@ export const Admin: React.FC = () => {
             onClick={handleResetToFinalBaseline}
             className="text-paper/40 hover:text-paper underline cursor-pointer"
           >
-            Re-sync 30 Dec Final Guestlist Baseline
+            Re-sync Complete 177-Guest Bride &amp; Bridegroom Baseline
           </button>
         </div>
       </div>
@@ -818,7 +999,9 @@ export const Admin: React.FC = () => {
 
               <div className="flex items-center gap-2 text-[#E8D3B9] font-sans text-[10px] uppercase tracking-[0.3em] font-bold mb-2">
                 <ArrowLeftRight className="w-4 h-4" />
-                <span>Standby Guest Replacement</span>
+                <span>
+                  Standby Replacement &bull; {replaceModalGuest.side}
+                </span>
               </div>
               <h3 className="font-serif text-2xl sm:text-3xl italic text-paper mb-2">
                 Replace {replaceModalGuest.name}
@@ -843,7 +1026,10 @@ export const Admin: React.FC = () => {
                     placeholder="e.g. Mr and Mrs Mangena or Timothy"
                     value={replaceForm.newName}
                     onChange={(e) =>
-                      setReplaceForm({ ...replaceForm, newName: e.target.value })
+                      setReplaceForm({
+                        ...replaceForm,
+                        newName: e.target.value,
+                      })
                     }
                     className="w-full bg-paper/5 border border-paper/20 rounded-xl px-4 py-3 text-sm text-paper focus:outline-none focus:border-[#E8D3B9]"
                   />
@@ -907,7 +1093,7 @@ export const Admin: React.FC = () => {
         )}
       </AnimatePresence>
 
-      {/* MODAL 2: Edit Guest Name / Phone / RSVP Status */}
+      {/* MODAL 2: Edit Guest Name / Side / Phone / RSVP Status */}
       <AnimatePresence>
         {editModalGuest && (
           <motion.div
@@ -954,6 +1140,25 @@ export const Admin: React.FC = () => {
                     }
                     className="w-full bg-paper/5 border border-paper/20 rounded-xl px-4 py-3 text-sm text-paper focus:outline-none focus:border-[#E8D3B9]"
                   />
+                </div>
+
+                <div>
+                  <label className="font-sans text-[10px] uppercase tracking-widest text-paper/70 block mb-1.5">
+                    Family Side
+                  </label>
+                  <select
+                    value={editForm.side}
+                    onChange={(e) =>
+                      setEditForm({
+                        ...editForm,
+                        side: e.target.value as GuestSide,
+                      })
+                    }
+                    className="w-full bg-[#1C1C1C] border border-paper/20 rounded-xl px-4 py-3 text-sm text-paper focus:outline-none focus:border-[#E8D3B9]"
+                  >
+                    <option value="BRIDE">Bride (Sithandiwe)</option>
+                    <option value="BRIDEGROOM">Bridegroom (Ndumiso)</option>
+                  </select>
                 </div>
 
                 <div>
@@ -1084,6 +1289,25 @@ export const Admin: React.FC = () => {
               <form onSubmit={submitAddGuest} className="flex flex-col gap-4">
                 <div>
                   <label className="font-sans text-[10px] uppercase tracking-widest text-paper/70 block mb-1.5">
+                    Family Side *
+                  </label>
+                  <select
+                    value={addForm.side}
+                    onChange={(e) =>
+                      setAddForm({
+                        ...addForm,
+                        side: e.target.value as GuestSide,
+                      })
+                    }
+                    className="w-full bg-[#1C1C1C] border border-paper/20 rounded-xl px-4 py-3 text-sm text-paper focus:outline-none focus:border-[#E8D3B9]"
+                  >
+                    <option value="BRIDE">Bride (Sithandiwe)</option>
+                    <option value="BRIDEGROOM">Bridegroom (Ndumiso)</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="font-sans text-[10px] uppercase tracking-widest text-paper/70 block mb-1.5">
                     Full Name *
                   </label>
                   <input
@@ -1150,7 +1374,7 @@ export const Admin: React.FC = () => {
         )}
       </AnimatePresence>
 
-      {/* MODAL 4: Google Sheets Auto-Deduplicate & Sync Apps Script */}
+      {/* MODAL 4: Google Sheets Auto-Deduplicate, Style & Bride/Bridegroom Sync Apps Script */}
       <AnimatePresence>
         {isScriptModalOpen && (
           <motion.div
@@ -1177,7 +1401,10 @@ export const Admin: React.FC = () => {
 
               <div className="flex items-center gap-2 text-emerald-300 font-sans text-[10px] uppercase tracking-[0.3em] font-bold mb-2">
                 <Sparkles className="w-4 h-4" />
-                <span>Automatic Google Sheets Duplicate Cleaner &amp; 2-Way Sync</span>
+                <span>
+                  Automatic Google Sheets Deduplication, Luxury Styling &amp;
+                  Bride/Bridegroom Tabs
+                </span>
               </div>
               <h3 className="font-serif text-2xl sm:text-3xl italic text-paper mb-3">
                 One-Paste Google Sheets Upgrade
@@ -1185,8 +1412,16 @@ export const Admin: React.FC = () => {
               <p className="font-sans text-xs text-paper/70 leading-relaxed mb-4">
                 Paste this upgraded script into your Google Sheet (
                 <strong>Extensions &rarr; Apps Script</strong>) and click{' '}
-                <strong>Deploy &rarr; Manage deployments &rarr; Edit &rarr; New version</strong>.
-                You can also click <strong>Run &rarr; cleanDuplicatesNow</strong> once inside Apps Script to immediately delete all duplicate rows (like Brillient&apos;s 10 entries) after it automatically creates a safety backup tab!
+                <strong>
+                  Deploy &rarr; Manage deployments &rarr; Edit (pencil icon)
+                  &rarr; Version: New version &rarr; Deploy
+                </strong>
+                . You can also click{' '}
+                <strong>Run &rarr; cleanDuplicatesNow</strong> once inside Apps
+                Script to immediately back up Sheet1, delete all duplicate rows,
+                recover <code>#ERROR!</code> phones, and generate the styled{' '}
+                <strong>Bride (Sithandiwe)</strong> and{' '}
+                <strong>Bridegroom (Ndumiso)</strong> tabs!
               </p>
 
               <div className="flex items-center justify-between mb-2">
